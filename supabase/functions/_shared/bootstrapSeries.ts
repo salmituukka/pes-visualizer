@@ -224,9 +224,7 @@ function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
     });
   }
   
-  // 2. Seasons + series + series_groups + sport_club_in_group
-  const seenGroupSportClub = new Set<string>(); // estää duplikaatit
-  
+  // 2. Seasons + series + series_groups
   for (const seasonData of raw.seasons) {
     rows.seasons.push({
       season_id: seasonData.season.id,
@@ -251,25 +249,17 @@ function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
       // Phases ja groups
       for (const phase of ss.phases || []) {
         for (const g of phase.groups || []) {
+          // Fallback-nimi null-nimisille ryhmille
+          // (yleensä kun sarjassa on vain yksi runkosarja ilman lohkoja)
+          const groupName = g.group.name ?? (g.group.is_playoff ? 'Pudotuspelit' : 'Runkosarja');
+          
           rows.series_groups.push({
             group_id: g.group.id,
             season_series_id: ss.seasonSeries.id,
-            name: g.group.name,
+            name: groupName,
             is_playoff: g.group.is_playoff,
             phase_id: phase.phase.id,
           });
-          
-          // Sport_club_in_group jäsenyydet
-          for (const sc_id of g.sportClubs || []) {
-            const key = `${g.group.id}-${sc_id}`;
-            if (!seenGroupSportClub.has(key)) {
-              seenGroupSportClub.add(key);
-              rows.sport_club_in_group.push({
-                group_id: g.group.id,
-                sport_club_id: sc_id,
-              });
-            }
-          }
         }
       }
     }
