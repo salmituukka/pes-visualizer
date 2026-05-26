@@ -93,7 +93,6 @@ export interface BootstrapCounts {
   series: number;
   series_groups: number;
   sport_clubs: number;
-  sport_club_in_group: number;
 }
 
 // ============================================================================
@@ -169,15 +168,9 @@ export async function bootstrapSeries(
     }
   }
   
-  // 3e. Sport_club_in_group (riippuu groups + sport_clubs:sta)
-  if (rows.sport_club_in_group.length > 0) {
-    for (const chunk of chunkArray(rows.sport_club_in_group, 1000)) {
-      const { error } = await supabase.from('sport_club_in_group').upsert(chunk, {
-        onConflict: 'group_id,sport_club_id',
-      });
-      if (error) return { status: 'error', error, step: 'sport_club_in_group' };
-    }
-  }
+  // 3e. (Aiemmin tallennettiin sport_club_in_group, mutta tämä taulu on poistettu
+  //      koska seura-jäsenyys per ryhmä saadaan tarvittaessa joukkuetietojen kautta
+  //      result-board-list-API:sta syncResultBoard-funktiossa.)
   
   // 3f. Päivitä system_meta
   const { error: metaErr } = await supabase.from('system_meta').upsert({
@@ -194,7 +187,6 @@ export async function bootstrapSeries(
       series: rows.series.length,
       series_groups: rows.series_groups.length,
       sport_clubs: rows.sportClubs.length,
-      sport_club_in_group: rows.sport_club_in_group.length,
     },
     duration_ms: Date.now() - startTime,
   };
@@ -209,7 +201,6 @@ interface BootstrapRows {
   series: Array<any>;
   series_groups: Array<any>;
   sportClubs: Array<any>;
-  sport_club_in_group: Array<{ group_id: number; sport_club_id: number }>;
 }
 
 function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
@@ -218,7 +209,6 @@ function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
     series: [],
     series_groups: [],
     sportClubs: [],
-    sport_club_in_group: [],
   };
   
   // 1. Sport_clubs (top-level)
@@ -234,9 +224,7 @@ function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
     });
   }
   
-  // 2. Seasons + series + series_groups + sport_club_in_group
-  const seenGroupSportClub = new Set<string>(); // estää duplikaatit
-  
+  // 2. Seasons + series + series_groups
   for (const seasonData of raw.seasons) {
     rows.seasons.push({
       season_id: seasonData.season.id,
@@ -261,25 +249,17 @@ function buildBootstrapRows(raw: RawSeriesListResponse): BootstrapRows {
       // Phases ja groups
       for (const phase of ss.phases || []) {
         for (const g of phase.groups || []) {
+          // Fallback-nimi null-nimisille ryhmille
+          // (yleensä kun sarjassa on vain yksi runkosarja ilman lohkoja)
+          const groupName = g.group.name ?? (g.group.is_playoff ? 'Pudotuspelit' : 'Runkosarja');
+          
           rows.series_groups.push({
             group_id: g.group.id,
             season_series_id: ss.seasonSeries.id,
-            name: g.group.name,
+            name: groupName,
             is_playoff: g.group.is_playoff,
             phase_id: phase.phase.id,
           });
-          
-          // Sport_club_in_group jäsenyydet
-          for (const sc_id of g.sportClubs || []) {
-            const key = `${g.group.id}-${sc_id}`;
-            if (!seenGroupSportClub.has(key)) {
-              seenGroupSportClub.add(key);
-              rows.sport_club_in_group.push({
-                group_id: g.group.id,
-                sport_club_id: sc_id,
-              });
-            }
-          }
         }
       }
     }
