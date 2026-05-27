@@ -1,9 +1,16 @@
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { parseSlot } from "@/lib/filters";
@@ -113,15 +120,15 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
       {/* Mobiili: bottom sheet */}
       {isMobile && (
         <Sheet open={openSlot !== null} onOpenChange={(o) => !o && setOpenSlot(null)}>
-          <SheetContent side="bottom" className="max-h-[80vh]">
+          <SheetContent side="bottom" className="max-h-[85vh] p-0 flex flex-col">
             {openSlot && (
               <>
-                <SheetHeader>
+                <SheetHeader className="p-4 pb-2">
                   <SheetTitle>
                     {openSlot === "batter" ? "Valitse lyöjä" : `Valitse ${SLOT_LABEL[openSlot]}`}
                   </SheetTitle>
                 </SheetHeader>
-                <ScrollArea className="mt-4 max-h-[60vh]">
+                <div className="flex-1 min-h-0 px-2 pb-4">
                   <SlotOptionsList
                     slot={openSlot}
                     roster={roster}
@@ -129,7 +136,7 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
                     measuredSlot={measuredSlot}
                     onSelect={(v) => handleSelect(openSlot, v)}
                   />
-                </ScrollArea>
+                </div>
               </>
             )}
           </SheetContent>
@@ -272,21 +279,14 @@ function SlotPopoverAnchor({
             style={{ width: 24, height: 24, opacity: 0 }}
           />
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-0" side="right" align="center">
-          <div className="p-3 border-b">
-            <p className="text-sm font-semibold">
-              {slot === "batter" ? "Valitse lyöjä" : `Valitse ${SLOT_LABEL[slot]}`}
-            </p>
-          </div>
-          <ScrollArea className="max-h-[320px]">
-            <SlotOptionsList
-              slot={slot}
-              roster={roster}
-              currentValue={currentValue}
-              measuredSlot={measuredSlot}
-              onSelect={onSelect}
-            />
-          </ScrollArea>
+        <PopoverContent className="w-72 p-0" side="right" align="center">
+          <SlotOptionsList
+            slot={slot}
+            roster={roster}
+            currentValue={currentValue}
+            measuredSlot={measuredSlot}
+            onSelect={onSelect}
+          />
         </PopoverContent>
       </Popover>
     </div>
@@ -333,45 +333,69 @@ function SlotOptionsList({
     .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
 
   return (
-    <RadioGroup
-      value={currentValue}
-      onValueChange={onSelect}
-      className="p-2"
-    >
-      {baseOptions.map((opt) => (
-        <Label
-          key={opt.value}
-          htmlFor={`${slot}-${opt.value}`}
-          className={cn(
-            "flex items-start gap-2 rounded-md px-2 py-2 text-sm font-normal cursor-pointer hover:bg-accent",
-            opt.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
-          )}
-        >
-          <RadioGroupItem value={opt.value} id={`${slot}-${opt.value}`} disabled={opt.disabled} className="mt-0.5" />
-          <span className="flex-1">
-            {opt.label}
-            {opt.note && <span className="block text-xs text-muted-foreground">{opt.note}</span>}
-          </span>
-        </Label>
-      ))}
+    <Command className="h-full max-h-[min(70vh,500px)]">
+      <CommandInput placeholder="Hae pelaajaa..." />
+      <CommandList className="max-h-none flex-1">
+        <CommandEmpty>Ei tuloksia.</CommandEmpty>
+        <CommandGroup>
+          {baseOptions.map((opt) => (
+            <CommandItem
+              key={opt.value}
+              value={`__opt_${opt.value}_${opt.label}`}
+              disabled={opt.disabled}
+              onSelect={() => !opt.disabled && onSelect(opt.value)}
+              className={cn(
+                "flex items-start gap-2",
+                opt.disabled && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              <Check
+                className={cn(
+                  "h-4 w-4 mt-0.5 shrink-0",
+                  currentValue === opt.value ? "opacity-100" : "opacity-0",
+                )}
+              />
+              <span className="flex-1">
+                {opt.label}
+                {opt.note && <span className="block text-xs text-muted-foreground">{opt.note}</span>}
+              </span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
 
-      <div className="my-2 border-t" />
+        {sortedPlayers.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Pelaajat">
+              {sortedPlayers.map((p) => {
+                const name = sortableName(p.full_name) || `Pelaaja #${p.player_id}`;
+                const idStr = String(p.player_id);
+                return (
+                  <CommandItem
+                    key={p.player_id}
+                    value={`${name} ${p.full_name ?? ""}`}
+                    onSelect={() => onSelect(idStr)}
+                    className="flex items-center gap-2"
+                  >
+                    <Check
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        currentValue === idStr ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    <span className="flex-1">{name}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
 
-      {sortedPlayers.length === 0 && (
-        <p className="px-2 py-3 text-xs text-muted-foreground">Pelaajalistaa ladataan…</p>
-      )}
-
-      {sortedPlayers.map((p) => (
-        <Label
-          key={p.player_id}
-          htmlFor={`${slot}-p-${p.player_id}`}
-          className="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-normal cursor-pointer hover:bg-accent"
-        >
-          <RadioGroupItem value={String(p.player_id)} id={`${slot}-p-${p.player_id}`} />
-          <span className="flex-1">{sortableName(p.full_name) || `Pelaaja #${p.player_id}`}</span>
-        </Label>
-      ))}
-    </RadioGroup>
+        {sortedPlayers.length === 0 && (
+          <p className="px-3 py-3 text-xs text-muted-foreground">Pelaajalistaa ladataan…</p>
+        )}
+      </CommandList>
+    </Command>
   );
 }
 
