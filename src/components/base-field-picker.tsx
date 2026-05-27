@@ -159,27 +159,27 @@ function SlotMarker({
   const isMeasured = parsed.kind === "measured";
   const r = isMeasured ? 5 : 4;
 
-  let fill = "hsl(var(--background))";
-  let stroke = "hsl(var(--muted-foreground))";
+  let fill = "var(--background)";
+  let stroke = "var(--muted-foreground)";
   let strokeDasharray: string | undefined;
   let inner: React.ReactNode = null;
 
   if (parsed.kind === "any") {
     inner = (
-      <text x={cx} y={cy} fontSize="3.5" textAnchor="middle" dominantBaseline="central" fill="hsl(var(--muted-foreground))">
+      <text x={cx} y={cy} fontSize="3.5" textAnchor="middle" dominantBaseline="central" fill="var(--muted-foreground)">
         ?
       </text>
     );
   } else if (parsed.kind === "none") {
     strokeDasharray = "1,0.6";
     inner = (
-      <text x={cx} y={cy} fontSize="3.5" textAnchor="middle" dominantBaseline="central" fill="hsl(var(--muted-foreground))">
+      <text x={cx} y={cy} fontSize="3.5" textAnchor="middle" dominantBaseline="central" fill="var(--muted-foreground)">
         ∅
       </text>
     );
   } else if (parsed.kind === "any_or_none") {
     inner = (
-      <text x={cx} y={cy} fontSize="2.8" textAnchor="middle" dominantBaseline="central" fill="hsl(var(--muted-foreground))">
+      <text x={cx} y={cy} fontSize="2.8" textAnchor="middle" dominantBaseline="central" fill="var(--muted-foreground)">
         ?∅
       </text>
     );
@@ -193,10 +193,10 @@ function SlotMarker({
     );
   } else if (parsed.kind === "player") {
     const p = playersById.get(parsed.id);
-    fill = "hsl(var(--primary))";
-    stroke = "hsl(var(--primary))";
+    fill = "var(--primary)";
+    stroke = "var(--primary)";
     inner = (
-      <text x={cx} y={cy} fontSize="3" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fill="hsl(var(--primary-foreground))">
+      <text x={cx} y={cy} fontSize="3" textAnchor="middle" dominantBaseline="central" fontWeight="bold" fill="var(--primary-foreground)">
         {initials(p?.full_name)}
       </text>
     );
