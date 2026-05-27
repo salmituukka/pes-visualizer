@@ -120,15 +120,15 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
       {/* Mobiili: bottom sheet */}
       {isMobile && (
         <Sheet open={openSlot !== null} onOpenChange={(o) => !o && setOpenSlot(null)}>
-          <SheetContent side="bottom" className="max-h-[80vh]">
+          <SheetContent side="bottom" className="max-h-[85vh] p-0 flex flex-col">
             {openSlot && (
               <>
-                <SheetHeader>
+                <SheetHeader className="p-4 pb-2">
                   <SheetTitle>
                     {openSlot === "batter" ? "Valitse lyöjä" : `Valitse ${SLOT_LABEL[openSlot]}`}
                   </SheetTitle>
                 </SheetHeader>
-                <ScrollArea className="mt-4 max-h-[60vh]">
+                <div className="flex-1 min-h-0 px-2 pb-4">
                   <SlotOptionsList
                     slot={openSlot}
                     roster={roster}
@@ -136,7 +136,7 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
                     measuredSlot={measuredSlot}
                     onSelect={(v) => handleSelect(openSlot, v)}
                   />
-                </ScrollArea>
+                </div>
               </>
             )}
           </SheetContent>
