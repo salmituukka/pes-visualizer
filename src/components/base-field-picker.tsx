@@ -427,6 +427,3 @@ function SummaryText({
     </p>
   );
 }
-
-// Vältetään käyttämättömän importin varoitus
-void useEffect;
