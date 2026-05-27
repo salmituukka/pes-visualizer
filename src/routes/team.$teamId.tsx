@@ -12,7 +12,7 @@ import {
 } from "@/lib/queries";
 import { ensurePlayerSync, parseMissingMatches } from "@/lib/match-sync";
 import { useQueryClient } from "@tanstack/react-query";
-import { BaseFieldPicker, type BaseSlot } from "@/components/base-field-picker";
+import { BaseFieldPicker, type SlotKey } from "@/components/base-field-picker";
 import { StatsDisplay } from "@/components/stats-display";
 import { aggregateAtBatStats, aggregatePitchStats } from "@/lib/aggregate";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,9 +25,10 @@ import { hasMeasured, type TeamFilters } from "@/lib/filters";
 const searchSchema = z.object({
   seasonSeriesId: fallback(z.coerce.number(), 0).default(0),
   groupId: fallback(z.coerce.number().optional(), undefined),
-  runner1: fallback(z.string(), "none").default("none"),
-  runner2: fallback(z.string(), "none").default("none"),
-  runner3: fallback(z.string(), "none").default("none"),
+  runner1: fallback(z.string(), "any").default("any"),
+  runner2: fallback(z.string(), "any").default("any"),
+  runner3: fallback(z.string(), "any").default("any"),
+  batter: fallback(z.string(), "any").default("any"),
   hitNumber: fallback(z.enum(["1", "2", "3", "any-single", "turn"]), "turn").default("turn"),
   goal: fallback(z.enum(["lead_advance", "tail_advance", "no_outs"]), "lead_advance").default("lead_advance"),
 });
@@ -131,19 +132,9 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const setSlot = (base: 1 | 2 | 3, value: BaseSlot) => {
-    const key = base === 1 ? "runner1" : base === 2 ? "runner2" : "runner3";
-    // Vain yksi pesä saa olla "measured"
+  const setSlot = (slot: SlotKey, value: string) => {
     navigate({
-      search: (prev: any) => {
-        const next = { ...prev, [key]: value };
-        if (value === "measured") {
-          (["runner1", "runner2", "runner3"] as const).forEach((k) => {
-            if (k !== key && next[k] === "measured") next[k] = "none";
-          });
-        }
-        return next;
-      },
+      search: (prev: any) => ({ ...prev, [slot]: value }),
     });
   };
 
@@ -156,13 +147,17 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pesätilanne</h3>
           <BaseFieldPicker
             roster={roster}
-            runner1={search.runner1}
-            runner2={search.runner2}
-            runner3={search.runner3}
+            values={{
+              runner1: search.runner1,
+              runner2: search.runner2,
+              runner3: search.runner3,
+              batter: search.batter,
+            }}
             onChange={setSlot}
           />
         </CardContent>
       </Card>
+
 
       <Card>
         <CardContent className="p-4 space-y-3">

@@ -389,6 +389,27 @@ export type Database = {
             ]
           },
           {
+            foreignKeyName: "pitch_participants_match_id_period_inning_bat_turn_at_bat__fkey"
+            columns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+              "hit_number",
+            ]
+            isOneToOne: false
+            referencedRelation: "v_pitches_with_outcome_color"
+            referencedColumns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+              "hit_number",
+            ]
+          },
+          {
             foreignKeyName: "pitch_participants_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
@@ -1044,6 +1065,27 @@ export type Database = {
             ]
           },
           {
+            foreignKeyName: "pitch_participants_match_id_period_inning_bat_turn_at_bat__fkey"
+            columns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+              "hit_number",
+            ]
+            isOneToOne: false
+            referencedRelation: "v_pitches_with_outcome_color"
+            referencedColumns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+              "hit_number",
+            ]
+          },
+          {
             foreignKeyName: "pitch_participants_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
@@ -1077,6 +1119,93 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "players"
             referencedColumns: ["player_id"]
+          },
+        ]
+      }
+      v_pitches_with_outcome_color: {
+        Row: {
+          any_player_advanced: boolean | null
+          any_player_out: boolean | null
+          any_player_wounded: boolean | null
+          at_bat_in_inning: number | null
+          bat_turn: number | null
+          batter_id: number | null
+          caught: boolean | null
+          hit_number: number | null
+          illegal: boolean | null
+          inning: number | null
+          match_id: number | null
+          outcome_color: string | null
+          period: number | null
+          season_series_id: number | null
+          start_runner_1b: number | null
+          start_runner_2b: number | null
+          start_runner_3b: number | null
+          team_id: number | null
+          x: number | null
+          y: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_season_series_id_fkey"
+            columns: ["season_series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["season_series_id"]
+          },
+          {
+            foreignKeyName: "pitches_batter_id_fkey"
+            columns: ["batter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "pitches_match_id_period_inning_bat_turn_at_bat_in_inning_fkey"
+            columns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+            ]
+            isOneToOne: false
+            referencedRelation: "at_bats"
+            referencedColumns: [
+              "match_id",
+              "period",
+              "inning",
+              "bat_turn",
+              "at_bat_in_inning",
+            ]
+          },
+          {
+            foreignKeyName: "pitches_start_runner_1b_fkey"
+            columns: ["start_runner_1b"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "pitches_start_runner_2b_fkey"
+            columns: ["start_runner_2b"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "pitches_start_runner_3b_fkey"
+            columns: ["start_runner_3b"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "pitches_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["team_id"]
           },
         ]
       }

@@ -3,6 +3,7 @@ import { parseSlot, hasMeasured, type TeamFilters } from "./filters";
 type AtBatRow = {
   team_id: number | null;
   player_id: number | null;
+  batter_id: number | null;
   role_at_start: string | null;
   start_base: number | null;
   effective_start_runner_1b: number | null;
@@ -24,32 +25,42 @@ type PitchRow = AtBatRow & {
 
 type Aggregated = Record<number, { full_name: string; successes: number; attempts: number }>;
 
-function matchesRunnerFilter(
+function matchesSlot(slotValue: string, actual: number | null): boolean {
+  const s = parseSlot(slotValue);
+  switch (s.kind) {
+    case "any":
+    case "any_or_none":
+    case "measured":
+      return true;
+    case "none":
+      return actual === null;
+    case "player":
+      return actual === s.id;
+  }
+}
+
+function matchesFilters(
   filters: TeamFilters,
   r1: number | null,
   r2: number | null,
   r3: number | null,
-) {
-  const slots: [number, string][] = [
-    [1, filters.runner1],
-    [2, filters.runner2],
-    [3, filters.runner3],
-  ];
-  for (const [base, slot] of slots) {
-    const parsed = parseSlot(slot);
-    const actual = base === 1 ? r1 : base === 2 ? r2 : r3;
-    if (parsed.kind === "none") {
-      if (actual !== null) return false;
-    } else if (parsed.kind === "player") {
-      if (actual !== parsed.id) return false;
-    }
-    // "measured" → rajataan myöhemmin player_id:llä
-  }
+  batterId: number | null,
+): boolean {
+  if (!matchesSlot(filters.runner1, r1)) return false;
+  if (!matchesSlot(filters.runner2, r2)) return false;
+  if (!matchesSlot(filters.runner3, r3)) return false;
+  if (!matchesSlot(filters.batter, batterId)) return false;
   return true;
 }
 
 function goalValue(
-  r: { goal_lead_advance: string | null; goal_tail_advance_runner: string | null; goal_tail_advance_batter: string | null; goal_no_outs?: string | null; start_base: number | null },
+  r: {
+    goal_lead_advance: string | null;
+    goal_tail_advance_runner: string | null;
+    goal_tail_advance_batter: string | null;
+    goal_no_outs?: string | null;
+    start_base: number | null;
+  },
   filters: TeamFilters,
 ): string | null {
   if (filters.goal === "tail_advance") {
@@ -65,7 +76,7 @@ export function aggregateAtBatStats(rows: AtBatRow[], filters: TeamFilters) {
   const agg: Aggregated = {};
 
   for (const r of rows) {
-    if (!matchesRunnerFilter(filters, r.effective_start_runner_1b, r.effective_start_runner_2b, r.effective_start_runner_3b)) continue;
+    if (!matchesFilters(filters, r.effective_start_runner_1b, r.effective_start_runner_2b, r.effective_start_runner_3b, r.batter_id)) continue;
     if (measuredBase !== null && r.start_base !== measuredBase) continue;
     if (!r.player_id) continue;
 
@@ -87,7 +98,7 @@ export function aggregatePitchStats(rows: PitchRow[], filters: TeamFilters) {
   const hitNum = filters.hitNumber;
 
   for (const r of rows) {
-    if (!matchesRunnerFilter(filters, r.start_runner_1b, r.start_runner_2b, r.start_runner_3b)) continue;
+    if (!matchesFilters(filters, r.start_runner_1b, r.start_runner_2b, r.start_runner_3b, r.batter_id)) continue;
     if (measuredBase !== null && r.start_base !== measuredBase) continue;
     if (!r.player_id) continue;
 
