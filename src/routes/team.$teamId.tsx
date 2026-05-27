@@ -132,19 +132,9 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const setSlot = (base: 1 | 2 | 3, value: BaseSlot) => {
-    const key = base === 1 ? "runner1" : base === 2 ? "runner2" : "runner3";
-    // Vain yksi pesä saa olla "measured"
+  const setSlot = (slot: SlotKey, value: string) => {
     navigate({
-      search: (prev: any) => {
-        const next = { ...prev, [key]: value };
-        if (value === "measured") {
-          (["runner1", "runner2", "runner3"] as const).forEach((k) => {
-            if (k !== key && next[k] === "measured") next[k] = "none";
-          });
-        }
-        return next;
-      },
+      search: (prev: any) => ({ ...prev, [slot]: value }),
     });
   };
 
@@ -157,13 +147,17 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pesätilanne</h3>
           <BaseFieldPicker
             roster={roster}
-            runner1={search.runner1}
-            runner2={search.runner2}
-            runner3={search.runner3}
+            values={{
+              runner1: search.runner1,
+              runner2: search.runner2,
+              runner3: search.runner3,
+              batter: search.batter,
+            }}
             onChange={setSlot}
           />
         </CardContent>
       </Card>
+
 
       <Card>
         <CardContent className="p-4 space-y-3">
