@@ -1,7 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { seriesListQueryOptions, groupsForSeasonSeriesQueryOptions, teamsInGroupQueryOptions } from "@/lib/queries";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import {
+  seriesListQueryOptions,
+  groupsForSeasonSeriesQueryOptions,
+  teamsInGroupQueryOptions,
+  ensureSeasonSeriesSyncedQueryOptions,
+} from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -26,6 +32,12 @@ function Index() {
     () => seriesList.find((s) => s.series_name === seriesName) ?? null,
     [seriesList, seriesName],
   );
+
+  // Varmista että sarja on synkronoitu kun kausi on valittu
+  const syncQuery = useQuery({
+    ...ensureSeasonSeriesSyncedQueryOptions(seasonSeriesId ?? 0),
+    enabled: !!seasonSeriesId,
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -74,18 +86,29 @@ function Index() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lohko</label>
-              <GroupSelect
-                seasonSeriesId={seasonSeriesId}
-                groupId={groupId}
-                onChange={setGroupId}
-              />
-            </div>
+            <GroupSlot
+              seasonSeriesId={seasonSeriesId}
+              groupId={groupId}
+              onChange={setGroupId}
+              syncReady={!!syncQuery.data && !syncQuery.isFetching}
+            />
           </CardContent>
         </Card>
 
-        {groupId && seasonSeriesId && (
+        {seasonSeriesId && syncQuery.isFetching && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Ladataan sarjan tietoja ensimmäistä kertaa…
+          </div>
+        )}
+
+        {seasonSeriesId && syncQuery.isError && (
+          <p className="text-sm text-destructive">
+            Sarjan tietojen lataus epäonnistui. Yritä myöhemmin uudelleen.
+          </p>
+        )}
+
+        {groupId && seasonSeriesId && syncQuery.data && (
           <TeamGrid groupId={groupId} seasonSeriesId={seasonSeriesId} />
         )}
       </main>
@@ -93,36 +116,52 @@ function Index() {
   );
 }
 
-function GroupSelect({ seasonSeriesId, groupId, onChange }: {
+function GroupSlot({ seasonSeriesId, groupId, onChange, syncReady }: {
   seasonSeriesId: number | null;
   groupId: number | null;
   onChange: (id: number) => void;
+  syncReady: boolean;
 }) {
   const { data: groups } = useQuery({
     ...groupsForSeasonSeriesQueryOptions(seasonSeriesId ?? 0),
-    enabled: !!seasonSeriesId,
+    enabled: !!seasonSeriesId && syncReady,
   });
 
-  // Auto-valitse jos vain yksi
-  if (groups && groups.length === 1 && groupId !== groups[0].group_id) {
-    onChange(groups[0].group_id);
+  // Auto-valitse runkosarjan ainoa lohko
+  const nonPlayoff = useMemo(() => (groups ?? []).filter((g) => !g.is_playoff), [groups]);
+  const onlyOne = nonPlayoff.length === 1 ? nonPlayoff[0] : null;
+
+  useEffect(() => {
+    if (onlyOne && groupId !== onlyOne.group_id) {
+      onChange(onlyOne.group_id);
+    }
+  }, [onlyOne, groupId, onChange]);
+
+  // Jos vain yksi runkosarjan lohko → piilota dropdown
+  if (onlyOne && (!groups || groups.length === 1)) {
+    return null;
   }
 
   return (
-    <Select
-      value={groupId ? String(groupId) : ""}
-      onValueChange={(v) => onChange(Number(v))}
-      disabled={!seasonSeriesId || !groups || groups.length === 0}
-    >
-      <SelectTrigger><SelectValue placeholder={groups?.length === 0 ? "Ei lohkoja" : "Valitse lohko"} /></SelectTrigger>
-      <SelectContent>
-        {groups?.map((g) => (
-          <SelectItem key={g.group_id} value={String(g.group_id)}>
-            {g.name}{g.is_playoff ? " (pudotuspelit)" : ""}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Lohko</label>
+      <Select
+        value={groupId ? String(groupId) : ""}
+        onValueChange={(v) => onChange(Number(v))}
+        disabled={!seasonSeriesId || !syncReady || !groups || groups.length === 0}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder={!syncReady ? "Odotetaan…" : groups?.length === 0 ? "Ei lohkoja" : "Valitse lohko"} />
+        </SelectTrigger>
+        <SelectContent>
+          {groups?.map((g) => (
+            <SelectItem key={g.group_id} value={String(g.group_id)}>
+              {g.name}{g.is_playoff ? " (pudotuspelit)" : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 

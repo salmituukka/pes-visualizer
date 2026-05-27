@@ -40,6 +40,29 @@ export const seriesListQueryOptions = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
+/** Varmistaa että kauden sarja on synkronoitu Supabaseen. Jos team_in_series_group on tyhjä,
+ *  kutsuu sync-result-board edge functionia ja palauttaa vasta sen jälkeen. */
+export const ensureSeasonSeriesSyncedQueryOptions = (season_series_id: number) =>
+  queryOptions({
+    queryKey: ["ensure-season-series-synced", season_series_id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("team_in_series_group")
+        .select("*", { count: "exact", head: true })
+        .eq("season_series_id", season_series_id);
+      if (error) throw error;
+
+      if ((count ?? 0) === 0) {
+        const { error: fnError } = await supabase.functions.invoke("sync-result-board", {
+          body: { season_series_id, phase: 1 },
+        });
+        if (fnError) throw fnError;
+      }
+      return { season_series_id, synced: true };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
 export const groupsForSeasonSeriesQueryOptions = (season_series_id: number) =>
   queryOptions({
     queryKey: ["series-groups", season_series_id],
