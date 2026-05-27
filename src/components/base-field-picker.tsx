@@ -328,9 +328,9 @@ function SlotOptionsList({
   });
 
   // Pelaajat: Sukunimi Etunimi -järjestys
-  const sortedPlayers = [...roster].sort((a, b) =>
-    sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"),
-  );
+  const sortedPlayers = roster
+    .filter((player) => (player.full_name ?? "").trim().length > 0)
+    .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
 
   return (
     <RadioGroup
@@ -368,7 +368,7 @@ function SlotOptionsList({
           className="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-normal cursor-pointer hover:bg-accent"
         >
           <RadioGroupItem value={String(p.player_id)} id={`${slot}-p-${p.player_id}`} />
-          <span className="flex-1">{sortableName(p.full_name)}</span>
+          <span className="flex-1">{sortableName(p.full_name) || `Pelaaja #${p.player_id}`}</span>
         </Label>
       ))}
     </RadioGroup>

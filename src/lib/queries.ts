@@ -95,24 +95,45 @@ export const teamRosterQueryOptions = (team_id: number, season_series_id: number
   queryOptions({
     queryKey: ["team-roster", team_id, season_series_id],
     queryFn: async () => {
-      // Pelaajat jotka ovat osallistuneet ko. joukkueessa ko. kaudella (at_bat tai pitch)
-      const { data, error } = await supabase
-        .from("v_at_bat_participants_with_goals")
-        .select("player_id, players!at_bat_participants_player_id_fkey(player_id, full_name, image_url)")
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(10000);
-      if (error) throw error;
-      const seen = new Map<number, { player_id: number; full_name: string | null; image_url: string | null }>();
-      for (const row of data ?? []) {
-        const p: any = (row as any).players;
-        if (p && p.player_id && !seen.has(p.player_id)) {
-          seen.set(p.player_id, { player_id: p.player_id, full_name: p.full_name, image_url: p.image_url });
-        }
-      }
-      return Array.from(seen.values()).sort((a, b) =>
-        (a.full_name ?? "").localeCompare(b.full_name ?? "", "fi"),
+      const [atBatResult, pitchResult] = await Promise.all([
+        supabase
+          .from("v_at_bat_participants_with_goals")
+          .select("player_id")
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .limit(10000),
+        supabase
+          .from("v_pitch_participants_with_goals")
+          .select("player_id")
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .limit(10000),
+      ]);
+
+      if (atBatResult.error) throw atBatResult.error;
+      if (pitchResult.error) throw pitchResult.error;
+
+      const playerIds = Array.from(
+        new Set(
+          [...(atBatResult.data ?? []), ...(pitchResult.data ?? [])]
+            .map((row) => row.player_id)
+            .filter((playerId): playerId is number => typeof playerId === "number"),
+        ),
       );
+
+      if (playerIds.length === 0) return [];
+
+      const { data: players, error: playersError } = await supabase
+        .from("players")
+        .select("player_id, full_name, image_url")
+        .in("player_id", playerIds)
+        .limit(10000);
+
+      if (playersError) throw playersError;
+
+      return (players ?? [])
+        .filter((player) => (player.full_name ?? "").trim().length > 0)
+        .sort((a, b) => a.full_name!.localeCompare(b.full_name!, "fi"));
     },
     staleTime: 60 * 1000,
   });
