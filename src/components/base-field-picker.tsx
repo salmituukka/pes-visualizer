@@ -16,15 +16,30 @@ export function BaseFieldPicker({ roster, runner1, runner2, runner3, onChange }:
   return (
     <div className="space-y-4">
       <div className="relative mx-auto aspect-square w-full max-w-[280px]">
-        {/* Timanttipohja */}
-        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full">
-          <polygon
-            points="100,20 180,100 100,180 20,100"
-            fill="hsl(var(--muted) / 0.4)"
-            stroke="hsl(var(--border))"
-            strokeWidth="2"
-          />
-          <circle cx="100" cy="100" r="8" fill="hsl(var(--muted-foreground) / 0.3)" />
+        <svg viewBox="0 0 57 113" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
+          {/* Kentän rajat */}
+          <g stroke="currentColor" fill="none" strokeWidth="0.4">
+            <line x1="5" y1="6" x2="52" y2="6" />
+            <line x1="5" y1="5.9" x2="5" y2="81" />
+            <line x1="52" y1="5.9" x2="52" y2="69" />
+            <line x1="5" y1="69" x2="27" y2="101" />
+            <line x1="52" y1="69" x2="30" y2="101" />
+            <line x1="5" y1="81" x2="20" y2="101" />
+            <line x1="18" y1="101" x2="40" y2="101" />
+            <path d="M40 101 A 1 1 0 0 1 18 101" />
+            <line x1="9.8" y1="87.4" x2="49.2" y2="64" />
+            <line x1="8" y1="63.5" x2="49" y2="63.5" />
+            {/* 3-pesän puoliympyrä vasemmalla */}
+            <path d="M5 59.5 A 1 1 0 0 1 5 65.5" />
+            {/* 2-pesän puoliympyrä oikealla */}
+            <path d="M52 65.5 A 1 1 0 0 1 52 59.5" />
+            {/* Lyöntiympyrä (1-pesä) */}
+            <path d="M13.2 81 C 16,80 18,81 19.1 81.9" />
+          </g>
+
+          {/* Klikattavat pesät — koordinaatit lukittu */}
+          {/* 3-pesä: (5, 62.5), 2-pesä: (52, 62.5), 1-pesä: (16, 81), Lyöjä: (28.5, 103) */}
+          {/* Pesän ympärille klikattava ympyrä r=4-5, sen sisällä visuaalinen merkintä */}
         </svg>
 
         {/* Pesä-slotit */}
