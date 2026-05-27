@@ -279,21 +279,14 @@ function SlotPopoverAnchor({
             style={{ width: 24, height: 24, opacity: 0 }}
           />
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-0" side="right" align="center">
-          <div className="p-3 border-b">
-            <p className="text-sm font-semibold">
-              {slot === "batter" ? "Valitse lyöjä" : `Valitse ${SLOT_LABEL[slot]}`}
-            </p>
-          </div>
-          <ScrollArea className="max-h-[320px]">
-            <SlotOptionsList
-              slot={slot}
-              roster={roster}
-              currentValue={currentValue}
-              measuredSlot={measuredSlot}
-              onSelect={onSelect}
-            />
-          </ScrollArea>
+        <PopoverContent className="w-72 p-0" side="right" align="center">
+          <SlotOptionsList
+            slot={slot}
+            roster={roster}
+            currentValue={currentValue}
+            measuredSlot={measuredSlot}
+            onSelect={onSelect}
+          />
         </PopoverContent>
       </Popover>
     </div>
