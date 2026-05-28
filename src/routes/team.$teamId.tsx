@@ -130,7 +130,7 @@ function TeamPage() {
   );
 }
 
-function FilterPanel({ roster }: { roster: { player_id: number; full_name: string | null }[] }) {
+function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: number; full_name: string | null }[]; teamId: number; seasonSeriesId: number }) {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -156,9 +156,13 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
               batter: search.batter,
             }}
             onChange={setSlot}
+            teamId={teamId}
+            seasonSeriesId={seasonSeriesId}
+            hitNumber={search.hitNumber}
           />
         </CardContent>
       </Card>
+
 
 
       <Card>
