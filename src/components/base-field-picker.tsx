@@ -197,6 +197,33 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
 
       <SummaryText values={values} playersById={playersById} />
 
+      {filteredPoints.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.green }} />
+            Eteneminen
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.yellow }} />
+            Koppi
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.red }} />
+            Palo
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.gray }} />
+            Ei muutosta
+          </span>
+          <span className="ml-auto">
+            {filteredPoints.length > MAX_POINTS
+              ? `Näytetään ${MAX_POINTS}/${filteredPoints.length} lyöntiä`
+              : `${filteredPoints.length} lyöntiä`}
+          </span>
+        </div>
+      )}
+
+
       {/* Mobiili: bottom sheet */}
       {isMobile && (
         <Sheet open={openSlot !== null} onOpenChange={(o) => !o && setOpenSlot(null)}>
