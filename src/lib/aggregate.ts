@@ -122,9 +122,11 @@ export function aggregatePitchStats(rows: PitchRow[], filters: TeamFilters) {
   return Object.entries(agg).map(([id, v]) => ({ player_id: Number(id), ...v }));
 }
 
+export type SlotKey = "batter" | "runner1" | "runner2" | "runner3";
+
 export type DistributionRow = {
-  player_id: number;
-  full_name: string;
+  slot: SlotKey;
+  label: string;
   total: number;
   scored: number;
   reached_3b: number;
@@ -135,43 +137,29 @@ export type DistributionRow = {
   out: number;
 };
 
-function isPlayerNamedOnField(
-  row: AtBatRow | PitchRow,
-  filters: TeamFilters,
-): boolean {
-  const pid = row.player_id;
-  if (pid == null) return false;
+const SLOT_ORDER: SlotKey[] = ["batter", "runner1", "runner2", "runner3"];
+const SLOT_LABELS: Record<SlotKey, string> = {
+  batter: "Lyöjä",
+  runner1: "1-pesä",
+  runner2: "2-pesä",
+  runner3: "3-pesä",
+};
+const SLOT_START_BASE: Record<SlotKey, number> = {
+  batter: 0,
+  runner1: 1,
+  runner2: 2,
+  runner3: 3,
+};
 
-  const s1 = parseSlot(filters.runner1);
-  const s2 = parseSlot(filters.runner2);
-  const s3 = parseSlot(filters.runner3);
-  const sb = parseSlot(filters.batter);
-
-  const hasPlayerSlot =
-    s1.kind === "player" ||
-    s2.kind === "player" ||
-    s3.kind === "player" ||
-    sb.kind === "player";
-
-  // Jos yksikään slot ei ole asetettu tiettyyn pelaajaan,
-  // näytä kaikki pelaajat jotka ovat kentällä (start_base !== null)
-  if (!hasPlayerSlot) {
-    return row.start_base !== null;
+function rowSlot(row: AtBatRow | PitchRow): SlotKey | null {
+  switch (row.start_base) {
+    case 0: return "batter";
+    case 1: return "runner1";
+    case 2: return "runner2";
+    case 3: return "runner3";
+    default:
+      return row.role_at_start === "batter" ? "batter" : null;
   }
-
-  // Jos jokin slot on asetettu tiettyyn pelaajaan,
-  // näytä vain matchaavat pelaajat kyseisessä roolissaan
-  const isRunner1 = pid === row.effective_start_runner_1b || row.start_base === 1;
-  const isRunner2 = pid === row.effective_start_runner_2b || row.start_base === 2;
-  const isRunner3 = pid === row.effective_start_runner_3b || row.start_base === 3;
-  const isBatter = pid === row.batter_id || row.start_base === 0 || row.role_at_start === "batter";
-
-  if (isRunner1 && s1.kind === "player" && s1.id === pid) return true;
-  if (isRunner2 && s2.kind === "player" && s2.id === pid) return true;
-  if (isRunner3 && s3.kind === "player" && s3.id === pid) return true;
-  if (isBatter && sb.kind === "player" && sb.id === pid) return true;
-
-  return false;
 }
 
 export function aggregateDistribution(
@@ -179,7 +167,20 @@ export function aggregateDistribution(
   filters: TeamFilters,
   level: "at_bat" | "pitch",
 ): DistributionRow[] {
-  const agg: Record<number, DistributionRow> = {};
+  const slotState: Record<SlotKey, ReturnType<typeof parseSlot>> = {
+    batter: parseSlot(filters.batter),
+    runner1: parseSlot(filters.runner1),
+    runner2: parseSlot(filters.runner2),
+    runner3: parseSlot(filters.runner3),
+  };
+
+  const makeRow = (slot: SlotKey, label: string): DistributionRow => ({
+    slot, label,
+    total: 0, scored: 0, reached_3b: 0, reached_2b: 0,
+    reached_1b: 0, wounded: 0, stayed: 0, out: 0,
+  });
+
+  const agg: Partial<Record<SlotKey, DistributionRow>> = {};
 
   for (const r of rows) {
     const r1 = level === "pitch" ? (r as PitchRow).start_runner_1b : r.effective_start_runner_1b;
@@ -197,38 +198,33 @@ export function aggregateDistribution(
 
     if (!r.player_id) continue;
 
-    if (!isPlayerNamedOnField(r, filters)) continue;
+    const slot = rowSlot(r);
+    if (!slot) continue;
+    if (r.start_base !== SLOT_START_BASE[slot]) continue;
 
-    const id = r.player_id;
-    if (!agg[id]) {
-      agg[id] = {
-        player_id: id,
-        full_name: r.players?.full_name ?? `#${id}`,
-        total: 0, scored: 0, reached_3b: 0, reached_2b: 0,
-        reached_1b: 0, wounded: 0, stayed: 0, out: 0,
-      };
-    }
+    const s = slotState[slot];
+    if (s.kind === "none" || s.kind === "measured") continue;
+    if (s.kind === "player" && s.id !== r.player_id) continue;
 
-    agg[id].total += 1;
+    const label = s.kind === "player"
+      ? (r.players?.full_name ?? `#${r.player_id}`)
+      : SLOT_LABELS[slot];
 
-    if (r.got_out || r.end_base === -1) {
-      agg[id].out += 1;
-    } else if (r.got_wounded) {
-      agg[id].wounded += 1;
-    } else if (r.end_base === 4) {
-      agg[id].scored += 1;
-    } else if (r.end_base === 3) {
-      agg[id].reached_3b += 1;
-    } else if (r.end_base === 2) {
-      agg[id].reached_2b += 1;
-    } else if (r.end_base === 1) {
-      agg[id].reached_1b += 1;
-    } else if (r.end_base === r.start_base) {
-      agg[id].stayed += 1;
-    } else {
-      agg[id].total -= 1;
-    }
+    if (!agg[slot]) agg[slot] = makeRow(slot, label);
+    const a = agg[slot]!;
+    a.total += 1;
+
+    if (r.got_out || r.end_base === -1) a.out += 1;
+    else if (r.got_wounded) a.wounded += 1;
+    else if (r.end_base === 4) a.scored += 1;
+    else if (r.end_base === 3) a.reached_3b += 1;
+    else if (r.end_base === 2) a.reached_2b += 1;
+    else if (r.end_base === 1) a.reached_1b += 1;
+    else if (r.end_base === r.start_base) a.stayed += 1;
+    else a.total -= 1;
   }
 
-  return Object.values(agg).sort((a, b) => b.total - a.total);
+  return SLOT_ORDER
+    .map((s) => agg[s])
+    .filter((r): r is DistributionRow => !!r && r.total > 0);
 }
