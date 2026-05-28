@@ -152,7 +152,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
             <g pointerEvents="none">
               {visiblePoints.map((p, i) => {
                 const cx = (p.x / 100) * 57;
-                const cy = 103 - (p.y / 100) * 97;
+                const cy = 6 + (p.y / 100) * 97;
                 return (
                   <circle
                     key={`${p.match_id}-${p.period}-${p.inning}-${p.bat_turn}-${p.at_bat_in_inning}-${p.hit_number}-${i}`}
