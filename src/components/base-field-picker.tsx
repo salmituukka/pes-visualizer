@@ -147,7 +147,28 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
             <path d="M13.2 81 C 16,80 18,81 19.1 81.9" />
           </g>
 
+          {/* Lyöntipisteet — renderöidään pesien alle */}
+          {visiblePoints.length > 0 && (
+            <g pointerEvents="none">
+              {visiblePoints.map((p, i) => {
+                const cx = (p.x / 100) * 57;
+                const cy = 103 - (p.y / 100) * 97;
+                return (
+                  <circle
+                    key={`${p.match_id}-${p.period}-${p.inning}-${p.bat_turn}-${p.at_bat_in_inning}-${p.hit_number}-${i}`}
+                    cx={cx}
+                    cy={cy}
+                    r={1.5}
+                    fill={COLOR_MAP[p.outcome_color]}
+                    opacity={0.6}
+                  />
+                );
+              })}
+            </g>
+          )}
+
           {(Object.keys(SLOT_POS) as SlotKey[]).map((slot) => (
+
             <SlotMarker
               key={slot}
               slot={slot}
