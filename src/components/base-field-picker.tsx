@@ -99,6 +99,29 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
 
   const playersById = new Map(roster.map((p) => [p.player_id, p]));
 
+  const enabled = !!teamId && !!seasonSeriesId && teamId > 0 && seasonSeriesId > 0;
+  const { data: pitchPoints } = useQuery({
+    ...pitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0),
+    enabled,
+  });
+
+  const filteredPoints = useMemo(() => {
+    if (!pitchPoints) return [];
+    return pitchPoints.filter((p) => {
+      if (!matchesRunnerSlot(values.runner1, p.start_runner_1b)) return false;
+      if (!matchesRunnerSlot(values.runner2, p.start_runner_2b)) return false;
+      if (!matchesRunnerSlot(values.runner3, p.start_runner_3b)) return false;
+      if (!matchesBatterSlot(values.batter, p.batter_id)) return false;
+      if (hitNumber === "1" || hitNumber === "2" || hitNumber === "3") {
+        if (p.hit_number !== Number(hitNumber)) return false;
+      }
+      return true;
+    });
+  }, [pitchPoints, values, hitNumber]);
+
+  const visiblePoints = filteredPoints.slice(0, MAX_POINTS);
+
+
   return (
     <div className="space-y-3">
       <div className="relative mx-auto w-full max-w-[250px] md:max-w-[200px]">
