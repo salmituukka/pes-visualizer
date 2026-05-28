@@ -111,7 +111,8 @@ function TeamPage() {
 
       <main className="mx-auto max-w-6xl px-4 py-6 grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="space-y-4">
-          <FilterPanel roster={roster ?? []} />
+          <FilterPanel roster={roster ?? []} teamId={teamIdNum} seasonSeriesId={seasonSeriesId} />
+
         </aside>
         <section className="space-y-4">
           {syncing && progress && (
