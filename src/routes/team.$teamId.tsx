@@ -14,7 +14,8 @@ import { ensurePlayerSync, parseMissingMatches } from "@/lib/match-sync";
 import { useQueryClient } from "@tanstack/react-query";
 import { BaseFieldPicker, type SlotKey } from "@/components/base-field-picker";
 import { StatsDisplay } from "@/components/stats-display";
-import { aggregateAtBatStats, aggregatePitchStats } from "@/lib/aggregate";
+import { DistributionDisplay } from "@/components/distribution-display";
+import { aggregateAtBatStats, aggregatePitchStats, aggregateDistribution } from "@/lib/aggregate";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -219,12 +220,25 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     enabled: usePitch && seasonSeriesId > 0,
   });
 
-  const rows = useMemo(() => {
+  const measured = hasMeasured(search);
+  const totalEvents = (atBatRows?.length ?? 0) + (pitchRows?.length ?? 0);
+
+  const rankingRows = useMemo(() => {
+    if (measured === null) return [];
     if (usePitch) return pitchRows ? aggregatePitchStats(pitchRows as any, search) : [];
     return atBatRows ? aggregateAtBatStats(atBatRows as any, search) : [];
-  }, [usePitch, atBatRows, pitchRows, search]);
+  }, [measured, usePitch, atBatRows, pitchRows, search]);
+
+  const distributionRows = useMemo(() => {
+    if (measured !== null) return [];
+    if (usePitch) return pitchRows ? aggregateDistribution(pitchRows as any, search, "pitch") : [];
+    return atBatRows ? aggregateDistribution(atBatRows as any, search, "at_bat") : [];
+  }, [measured, usePitch, atBatRows, pitchRows, search]);
 
   if (a1 || a2) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
 
-  return <StatsDisplay rows={rows} filters={search} totalEvents={(atBatRows?.length ?? 0) + (pitchRows?.length ?? 0)} />;
+  if (measured !== null) {
+    return <StatsDisplay rows={rankingRows} filters={search} totalEvents={totalEvents} />;
+  }
+  return <DistributionDisplay rows={distributionRows} totalEvents={totalEvents} />;
 }
