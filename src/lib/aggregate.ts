@@ -232,37 +232,16 @@ export function aggregateDistribution(
     const a = agg[slot]!;
     a.total += 1;
 
-    let categorized = false;
-    if (r.got_out || r.end_base === -1) {
-      a.out += 1;
-      categorized = true;
-    } else if (r.got_wounded) {
-      a.wounded += 1;
-      categorized = true;
-    } else if (r.end_base === 4) {
-      a.scored += 1;
-      categorized = true;
-    } else if (r.end_base === 3) {
-      a.reached_3b += 1;
-      categorized = true;
-    } else if (r.end_base === 2) {
-      a.reached_2b += 1;
-      categorized = true;
-    } else if (r.end_base === 1) {
-      a.reached_1b += 1;
-      categorized = true;
-    } else if (r.end_base === r.start_base && r.start_base !== 0) {
-      // "Pysyi" -luokka vain etenijöille, ei lyöjille joiden vuoro on kesken
-      a.stayed += 1;
-      categorized = true;
-    }
+    a.total += 1;
 
-    if (categorized) {
-      a.total += 1;
-    } else {
-      // Vuoro on "kesken" (lyöjä jäi jaa-vuoroon) — ei laskettava jakaumaan
-      // Älä lisää totaaliin myöskään
-    }
+    if (r.got_out || r.end_base === -1) a.out += 1;
+    else if (r.got_wounded) a.wounded += 1;
+    else if (r.end_base === 4) a.scored += 1;
+    else if (r.end_base === 3) a.reached_3b += 1;
+    else if (r.end_base === 2) a.reached_2b += 1;
+    else if (r.end_base === 1) a.reached_1b += 1;
+    else if (r.end_base === r.start_base) a.stayed += 1;
+    else a.total -= 1;
   }
 
   return SLOT_ORDER.map((s) => agg[s]).filter((r): r is DistributionRow => !!r && r.total > 0);
