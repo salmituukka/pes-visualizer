@@ -77,9 +77,9 @@ export function DistributionDisplay({
           <Legend />
           <div className="space-y-3">
             {rows.map((r) => (
-              <div key={r.player_id} className="space-y-1">
+              <div key={r.slot} className="space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">{r.full_name}</span>
+                  <span className="font-medium">{r.label}</span>
                   <span className="text-muted-foreground">n = {r.total}</span>
                 </div>
                 <StackedBar row={r} />
@@ -111,8 +111,8 @@ export function DistributionDisplay({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.player_id} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{r.full_name}</td>
+                  <tr key={r.slot} className="border-b last:border-0">
+                    <td className="py-2 font-medium">{r.label}</td>
                     <td className="py-2 text-right tabular-nums">{r.total}</td>
                     <td className="py-2 text-right tabular-nums">{r.scored}</td>
                     <td className="py-2 text-right tabular-nums">{r.reached_3b}</td>
