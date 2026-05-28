@@ -78,7 +78,8 @@ function matchesBatterSlot(filter: string, value: number | null): boolean {
   return true;
 }
 
-export function BaseFieldPicker({ roster, values, onChange }: Props) {
+export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber }: Props) {
+
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
   const isMobile = useIsMobile();
 
