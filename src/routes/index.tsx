@@ -124,6 +124,65 @@ function Index() {
   );
 }
 
+function SeriesPicker({
+  seriesList,
+  value,
+  onChange,
+}: {
+  seriesList: { series_name: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = seriesList.find((s) => s.series_name === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            !value && "text-muted-foreground",
+          )}
+        >
+          <span className="truncate">{selected?.series_name ?? "Valitse sarja"}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Hae sarjaa…" />
+          <CommandList>
+            <CommandEmpty>Ei tuloksia.</CommandEmpty>
+            <CommandGroup>
+              {seriesList.map((s) => (
+                <CommandItem
+                  key={s.series_name}
+                  value={s.series_name}
+                  onSelect={(v) => {
+                    onChange(v);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Check
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      value === s.series_name ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="flex-1">{s.series_name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function GroupSlot({ seasonSeriesId, groupId, onChange, syncReady }: {
   seasonSeriesId: number | null;
   groupId: number | null;
