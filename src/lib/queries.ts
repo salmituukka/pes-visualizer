@@ -199,7 +199,7 @@ export const atBatParticipantsQueryOptions = (team_id: number, season_series_id:
       const { data, error } = await supabase
         .from("v_at_bat_participants_with_goals")
         .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, players!at_bat_participants_player_id_fkey(full_name)"
+          "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, had_hit_advance, had_error_advance, had_steal, had_walk, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!at_bat_participants_player_id_fkey(full_name)"
         )
         .eq("team_id", team_id)
         .eq("season_series_id", season_series_id)
