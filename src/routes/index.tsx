@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import {
   seriesListQueryOptions,
   groupsForSeasonSeriesQueryOptions,
@@ -10,6 +10,20 @@ import {
 } from "@/lib/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,21 +67,15 @@ function Index() {
           <CardContent className="grid gap-4 p-6 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Sarja</label>
-              <Select
+              <SeriesPicker
+                seriesList={seriesList}
                 value={seriesName}
-                onValueChange={(v) => {
+                onChange={(v) => {
                   setSeriesName(v);
                   setSeasonSeriesId(null);
                   setGroupId(null);
                 }}
-              >
-                <SelectTrigger><SelectValue placeholder="Valitse sarja" /></SelectTrigger>
-                <SelectContent>
-                  {seriesList.map((s) => (
-                    <SelectItem key={s.series_name} value={s.series_name}>{s.series_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
@@ -113,6 +121,65 @@ function Index() {
         )}
       </main>
     </div>
+  );
+}
+
+function SeriesPicker({
+  seriesList,
+  value,
+  onChange,
+}: {
+  seriesList: { series_name: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = seriesList.find((s) => s.series_name === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            !value && "text-muted-foreground",
+          )}
+        >
+          <span className="truncate">{selected?.series_name ?? "Valitse sarja"}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Hae sarjaa…" />
+          <CommandList>
+            <CommandEmpty>Ei tuloksia.</CommandEmpty>
+            <CommandGroup>
+              {seriesList.map((s) => (
+                <CommandItem
+                  key={s.series_name}
+                  value={s.series_name}
+                  onSelect={(v) => {
+                    onChange(v);
+                    setOpen(false);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Check
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      value === s.series_name ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="flex-1">{s.series_name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
