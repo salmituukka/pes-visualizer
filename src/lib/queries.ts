@@ -227,3 +227,48 @@ export const pitchParticipantsQueryOptions = (team_id: number, season_series_id:
     },
     staleTime: 30 * 1000,
   });
+
+// ============================================================================
+// Pitch points — heatmap-pisteet kentälle
+// ============================================================================
+
+export type PitchPoint = {
+  match_id: number;
+  period: number;
+  inning: number;
+  bat_turn: number;
+  at_bat_in_inning: number;
+  hit_number: number;
+  batter_id: number | null;
+  x: number;
+  y: number;
+  outcome_color: "red" | "yellow" | "green" | "gray";
+  start_runner_1b: number | null;
+  start_runner_2b: number | null;
+  start_runner_3b: number | null;
+};
+
+export const pitchPointsQueryOptions = (team_id: number, season_series_id: number) =>
+  queryOptions({
+    queryKey: ["pitch-points", team_id, season_series_id],
+    queryFn: async (): Promise<PitchPoint[]> => {
+      const { data, error } = await supabase
+        .from("v_pitches_with_outcome_color")
+        .select(
+          "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
+        )
+        .eq("team_id", team_id)
+        .eq("season_series_id", season_series_id)
+        .limit(50000);
+      if (error) throw error;
+      return (data ?? []).filter(
+        (r) =>
+          r.match_id != null &&
+          r.x != null &&
+          r.y != null &&
+          r.outcome_color != null,
+      ) as PitchPoint[];
+    },
+    staleTime: 60 * 1000,
+  });
+

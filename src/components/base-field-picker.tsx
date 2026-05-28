@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
+import { pitchPointsQueryOptions, type PitchPoint } from "@/lib/queries";
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -41,9 +44,42 @@ type Props = {
   roster: RosterPlayer[];
   values: Record<SlotKey, string>;
   onChange: (slot: SlotKey, value: string) => void;
+  teamId?: number;
+  seasonSeriesId?: number;
+  hitNumber?: string;
 };
 
-export function BaseFieldPicker({ roster, values, onChange }: Props) {
+const COLOR_MAP: Record<PitchPoint["outcome_color"], string> = {
+  red: "#dc2626",
+  yellow: "#eab308",
+  green: "#16a34a",
+  gray: "#9ca3af",
+};
+
+const MAX_POINTS = 1000;
+
+function matchesRunnerSlot(filter: string, value: number | null): boolean {
+  const p = parseSlot(filter);
+  switch (p.kind) {
+    case "any":
+    case "any_or_none":
+    case "measured":
+      return true;
+    case "none":
+      return value == null;
+    case "player":
+      return value === p.id;
+  }
+}
+
+function matchesBatterSlot(filter: string, value: number | null): boolean {
+  const p = parseSlot(filter);
+  if (p.kind === "player") return value === p.id;
+  return true;
+}
+
+export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber }: Props) {
+
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
   const isMobile = useIsMobile();
 
@@ -62,6 +98,29 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
   };
 
   const playersById = new Map(roster.map((p) => [p.player_id, p]));
+
+  const enabled = !!teamId && !!seasonSeriesId && teamId > 0 && seasonSeriesId > 0;
+  const { data: pitchPoints } = useQuery({
+    ...pitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0),
+    enabled,
+  });
+
+  const filteredPoints = useMemo(() => {
+    if (!pitchPoints) return [];
+    return pitchPoints.filter((p) => {
+      if (!matchesRunnerSlot(values.runner1, p.start_runner_1b)) return false;
+      if (!matchesRunnerSlot(values.runner2, p.start_runner_2b)) return false;
+      if (!matchesRunnerSlot(values.runner3, p.start_runner_3b)) return false;
+      if (!matchesBatterSlot(values.batter, p.batter_id)) return false;
+      if (hitNumber === "1" || hitNumber === "2" || hitNumber === "3") {
+        if (p.hit_number !== Number(hitNumber)) return false;
+      }
+      return true;
+    });
+  }, [pitchPoints, values, hitNumber]);
+
+  const visiblePoints = filteredPoints.slice(0, MAX_POINTS);
+
 
   return (
     <div className="space-y-3">
@@ -88,7 +147,28 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
             <path d="M13.2 81 C 16,80 18,81 19.1 81.9" />
           </g>
 
+          {/* Lyöntipisteet — renderöidään pesien alle */}
+          {visiblePoints.length > 0 && (
+            <g pointerEvents="none">
+              {visiblePoints.map((p, i) => {
+                const cx = (p.x / 100) * 57;
+                const cy = 103 - (p.y / 100) * 97;
+                return (
+                  <circle
+                    key={`${p.match_id}-${p.period}-${p.inning}-${p.bat_turn}-${p.at_bat_in_inning}-${p.hit_number}-${i}`}
+                    cx={cx}
+                    cy={cy}
+                    r={1.5}
+                    fill={COLOR_MAP[p.outcome_color]}
+                    opacity={0.6}
+                  />
+                );
+              })}
+            </g>
+          )}
+
           {(Object.keys(SLOT_POS) as SlotKey[]).map((slot) => (
+
             <SlotMarker
               key={slot}
               slot={slot}
@@ -116,6 +196,33 @@ export function BaseFieldPicker({ roster, values, onChange }: Props) {
       </div>
 
       <SummaryText values={values} playersById={playersById} />
+
+      {filteredPoints.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.green }} />
+            Eteneminen
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.yellow }} />
+            Koppi
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.red }} />
+            Palo
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: COLOR_MAP.gray }} />
+            Ei muutosta
+          </span>
+          <span className="ml-auto">
+            {filteredPoints.length > MAX_POINTS
+              ? `Näytetään ${MAX_POINTS}/${filteredPoints.length} lyöntiä`
+              : `${filteredPoints.length} lyöntiä`}
+          </span>
+        </div>
+      )}
+
 
       {/* Mobiili: bottom sheet */}
       {isMobile && (

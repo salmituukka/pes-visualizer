@@ -111,7 +111,8 @@ function TeamPage() {
 
       <main className="mx-auto max-w-6xl px-4 py-6 grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="space-y-4">
-          <FilterPanel roster={roster ?? []} />
+          <FilterPanel roster={roster ?? []} teamId={teamIdNum} seasonSeriesId={seasonSeriesId} />
+
         </aside>
         <section className="space-y-4">
           {syncing && progress && (
@@ -129,7 +130,7 @@ function TeamPage() {
   );
 }
 
-function FilterPanel({ roster }: { roster: { player_id: number; full_name: string | null }[] }) {
+function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: number; full_name: string | null }[]; teamId: number; seasonSeriesId: number }) {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -155,9 +156,13 @@ function FilterPanel({ roster }: { roster: { player_id: number; full_name: strin
               batter: search.batter,
             }}
             onChange={setSlot}
+            teamId={teamId}
+            seasonSeriesId={seasonSeriesId}
+            hitNumber={search.hitNumber}
           />
         </CardContent>
       </Card>
+
 
 
       <Card>
