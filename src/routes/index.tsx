@@ -67,21 +67,15 @@ function Index() {
           <CardContent className="grid gap-4 p-6 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Sarja</label>
-              <Select
+              <SeriesPicker
+                seriesList={seriesList}
                 value={seriesName}
-                onValueChange={(v) => {
+                onChange={(v) => {
                   setSeriesName(v);
                   setSeasonSeriesId(null);
                   setGroupId(null);
                 }}
-              >
-                <SelectTrigger><SelectValue placeholder="Valitse sarja" /></SelectTrigger>
-                <SelectContent>
-                  {seriesList.map((s) => (
-                    <SelectItem key={s.series_name} value={s.series_name}>{s.series_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
 
             <div className="space-y-2">
