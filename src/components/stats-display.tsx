@@ -86,11 +86,11 @@ export function StatsDisplay({
 function labelForGoal(goal: TeamFilters["goal"]) {
   switch (goal) {
     case "lead_advance":
-      return "Kärkisiirtymän onnistuminen";
+      return "Kärkisiirtymä — onnistumiset";
     case "tail_advance":
-      return "Takasiirtymän onnistuminen";
+      return "Takasiirtymä — onnistumiset";
     case "no_outs":
-      return "Ei paloja";
+      return "Ei paloja — onnistumiset";
     default:
       return "Tilastot";
   }
