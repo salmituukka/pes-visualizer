@@ -77,9 +77,9 @@ export function DistributionDisplay({
           <Legend />
           <div className="space-y-3">
             {rows.map((r) => (
-              <div key={r.player_id} className="space-y-1">
+              <div key={r.slot} className="space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">{r.full_name}</span>
+                  <span className="font-medium">{r.label}</span>
                   <span className="text-muted-foreground">n = {r.total}</span>
                 </div>
                 <StackedBar row={r} />
