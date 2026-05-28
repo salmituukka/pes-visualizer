@@ -6,12 +6,17 @@ type AtBatRow = {
   batter_id: number | null;
   role_at_start: string | null;
   start_base: number | null;
+  end_base: number | null;
   effective_start_runner_1b: number | null;
   effective_start_runner_2b: number | null;
   effective_start_runner_3b: number | null;
+  had_hit_advance: boolean | null;
+  got_out: boolean | null;
+  got_wounded: boolean | null;
   goal_lead_advance: string | null;
   goal_tail_advance_runner: string | null;
   goal_tail_advance_batter: string | null;
+  goal_no_outs: string | null;
   players: { full_name: string | null } | null;
 };
 
@@ -20,7 +25,6 @@ type PitchRow = AtBatRow & {
   start_runner_1b: number | null;
   start_runner_2b: number | null;
   start_runner_3b: number | null;
-  goal_no_outs: string | null;
 };
 
 type Aggregated = Record<number, { full_name: string; successes: number; attempts: number }>;
