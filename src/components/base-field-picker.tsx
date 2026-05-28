@@ -44,7 +44,39 @@ type Props = {
   roster: RosterPlayer[];
   values: Record<SlotKey, string>;
   onChange: (slot: SlotKey, value: string) => void;
+  teamId?: number;
+  seasonSeriesId?: number;
+  hitNumber?: string;
 };
+
+const COLOR_MAP: Record<PitchPoint["outcome_color"], string> = {
+  red: "#dc2626",
+  yellow: "#eab308",
+  green: "#16a34a",
+  gray: "#9ca3af",
+};
+
+const MAX_POINTS = 1000;
+
+function matchesRunnerSlot(filter: string, value: number | null): boolean {
+  const p = parseSlot(filter);
+  switch (p.kind) {
+    case "any":
+    case "any_or_none":
+    case "measured":
+      return true;
+    case "none":
+      return value == null;
+    case "player":
+      return value === p.id;
+  }
+}
+
+function matchesBatterSlot(filter: string, value: number | null): boolean {
+  const p = parseSlot(filter);
+  if (p.kind === "player") return value === p.id;
+  return true;
+}
 
 export function BaseFieldPicker({ roster, values, onChange }: Props) {
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
