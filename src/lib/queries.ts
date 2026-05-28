@@ -14,11 +14,22 @@ export type SeriesOption = {
 export const seriesListQueryOptions = queryOptions({
   queryKey: ["series-list"],
   queryFn: async (): Promise<SeriesOption[]> => {
-    const { data, error } = await supabase
-      .from("series")
-      .select("name, season_series_id, season_id, seasons(year)")
-      .order("name");
-    if (error) throw error;
+    const pageSize = 1000;
+    let from = 0;
+    const data: any[] = [];
+    while (true) {
+      const { data: page, error } = await supabase
+        .from("series")
+        .select("name, season_series_id, season_id, seasons(year)")
+        .order("name")
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      if (!page || page.length === 0) break;
+      data.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+
 
     const map = new Map<string, SeriesOption>();
     for (const row of data ?? []) {
