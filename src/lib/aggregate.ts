@@ -80,7 +80,16 @@ export function aggregateAtBatStats(rows: AtBatRow[], filters: TeamFilters) {
   const agg: Aggregated = {};
 
   for (const r of rows) {
-    if (!matchesFilters(filters, r.effective_start_runner_1b, r.effective_start_runner_2b, r.effective_start_runner_3b, r.batter_id)) continue;
+    if (
+      !matchesFilters(
+        filters,
+        r.effective_start_runner_1b,
+        r.effective_start_runner_2b,
+        r.effective_start_runner_3b,
+        r.batter_id,
+      )
+    )
+      continue;
     if (measuredBase !== null && r.start_base !== measuredBase) continue;
     if (!r.player_id) continue;
 
@@ -153,10 +162,14 @@ const SLOT_START_BASE: Record<SlotKey, number> = {
 
 function rowSlot(row: AtBatRow | PitchRow): SlotKey | null {
   switch (row.start_base) {
-    case 0: return "batter";
-    case 1: return "runner1";
-    case 2: return "runner2";
-    case 3: return "runner3";
+    case 0:
+      return "batter";
+    case 1:
+      return "runner1";
+    case 2:
+      return "runner2";
+    case 3:
+      return "runner3";
     default:
       return row.role_at_start === "batter" ? "batter" : null;
   }
@@ -175,9 +188,16 @@ export function aggregateDistribution(
   };
 
   const makeRow = (slot: SlotKey, label: string): DistributionRow => ({
-    slot, label,
-    total: 0, scored: 0, reached_3b: 0, reached_2b: 0,
-    reached_1b: 0, wounded: 0, stayed: 0, out: 0,
+    slot,
+    label,
+    total: 0,
+    scored: 0,
+    reached_3b: 0,
+    reached_2b: 0,
+    reached_1b: 0,
+    wounded: 0,
+    stayed: 0,
+    out: 0,
   });
 
   const agg: Partial<Record<SlotKey, DistributionRow>> = {};
@@ -206,25 +226,44 @@ export function aggregateDistribution(
     if (s.kind === "none" || s.kind === "measured") continue;
     if (s.kind === "player" && s.id !== r.player_id) continue;
 
-    const label = s.kind === "player"
-      ? (r.players?.full_name ?? `#${r.player_id}`)
-      : SLOT_LABELS[slot];
+    const label = s.kind === "player" ? (r.players?.full_name ?? `#${r.player_id}`) : SLOT_LABELS[slot];
 
     if (!agg[slot]) agg[slot] = makeRow(slot, label);
     const a = agg[slot]!;
     a.total += 1;
 
-    if (r.got_out || r.end_base === -1) a.out += 1;
-    else if (r.got_wounded) a.wounded += 1;
-    else if (r.end_base === 4) a.scored += 1;
-    else if (r.end_base === 3) a.reached_3b += 1;
-    else if (r.end_base === 2) a.reached_2b += 1;
-    else if (r.end_base === 1) a.reached_1b += 1;
-    else if (r.end_base === r.start_base) a.stayed += 1;
-    else a.total -= 1;
+    let categorized = false;
+    if (r.got_out || r.end_base === -1) {
+      a.out += 1;
+      categorized = true;
+    } else if (r.got_wounded) {
+      a.wounded += 1;
+      categorized = true;
+    } else if (r.end_base === 4) {
+      a.scored += 1;
+      categorized = true;
+    } else if (r.end_base === 3) {
+      a.reached_3b += 1;
+      categorized = true;
+    } else if (r.end_base === 2) {
+      a.reached_2b += 1;
+      categorized = true;
+    } else if (r.end_base === 1) {
+      a.reached_1b += 1;
+      categorized = true;
+    } else if (r.end_base === r.start_base && r.start_base !== 0) {
+      // "Pysyi" -luokka vain etenijöille, ei lyöjille joiden vuoro on kesken
+      a.stayed += 1;
+      categorized = true;
+    }
+
+    if (categorized) {
+      a.total += 1;
+    } else {
+      // Vuoro on "kesken" (lyöjä jäi jaa-vuoroon) — ei laskettava jakaumaan
+      // Älä lisää totaaliin myöskään
+    }
   }
 
-  return SLOT_ORDER
-    .map((s) => agg[s])
-    .filter((r): r is DistributionRow => !!r && r.total > 0);
+  return SLOT_ORDER.map((s) => agg[s]).filter((r): r is DistributionRow => !!r && r.total > 0);
 }
