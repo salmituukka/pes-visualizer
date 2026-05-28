@@ -121,3 +121,72 @@ export function aggregatePitchStats(rows: PitchRow[], filters: TeamFilters) {
 
   return Object.entries(agg).map(([id, v]) => ({ player_id: Number(id), ...v }));
 }
+
+export type DistributionRow = {
+  player_id: number;
+  full_name: string;
+  total: number;
+  scored: number;
+  reached_3b: number;
+  reached_2b: number;
+  reached_1b: number;
+  wounded: number;
+  stayed: number;
+  out: number;
+};
+
+export function aggregateDistribution(
+  rows: AtBatRow[] | PitchRow[],
+  filters: TeamFilters,
+  level: "at_bat" | "pitch",
+): DistributionRow[] {
+  const agg: Record<number, DistributionRow> = {};
+
+  for (const r of rows) {
+    const r1 = level === "pitch" ? (r as PitchRow).start_runner_1b : r.effective_start_runner_1b;
+    const r2 = level === "pitch" ? (r as PitchRow).start_runner_2b : r.effective_start_runner_2b;
+    const r3 = level === "pitch" ? (r as PitchRow).start_runner_3b : r.effective_start_runner_3b;
+
+    if (!matchesFilters(filters, r1, r2, r3, r.batter_id)) continue;
+
+    if (level === "pitch") {
+      const hitNum = filters.hitNumber;
+      if (hitNum === "1" || hitNum === "2" || hitNum === "3") {
+        if ((r as PitchRow).hit_number !== Number(hitNum)) continue;
+      }
+    }
+
+    if (!r.player_id) continue;
+    const id = r.player_id;
+    if (!agg[id]) {
+      agg[id] = {
+        player_id: id,
+        full_name: r.players?.full_name ?? `#${id}`,
+        total: 0, scored: 0, reached_3b: 0, reached_2b: 0,
+        reached_1b: 0, wounded: 0, stayed: 0, out: 0,
+      };
+    }
+
+    agg[id].total += 1;
+
+    if (r.got_out || r.end_base === -1) {
+      agg[id].out += 1;
+    } else if (r.got_wounded) {
+      agg[id].wounded += 1;
+    } else if (r.end_base === 4) {
+      agg[id].scored += 1;
+    } else if (r.end_base === 3) {
+      agg[id].reached_3b += 1;
+    } else if (r.end_base === 2) {
+      agg[id].reached_2b += 1;
+    } else if (r.end_base === 1) {
+      agg[id].reached_1b += 1;
+    } else if (r.end_base === r.start_base) {
+      agg[id].stayed += 1;
+    } else {
+      agg[id].total -= 1;
+    }
+  }
+
+  return Object.values(agg).sort((a, b) => b.total - a.total);
+}
