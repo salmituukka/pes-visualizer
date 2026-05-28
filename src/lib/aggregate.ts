@@ -135,6 +135,45 @@ export type DistributionRow = {
   out: number;
 };
 
+function isPlayerNamedOnField(
+  row: AtBatRow | PitchRow,
+  filters: TeamFilters,
+): boolean {
+  const pid = row.player_id;
+  if (pid == null) return false;
+
+  const s1 = parseSlot(filters.runner1);
+  const s2 = parseSlot(filters.runner2);
+  const s3 = parseSlot(filters.runner3);
+  const sb = parseSlot(filters.batter);
+
+  const hasPlayerSlot =
+    s1.kind === "player" ||
+    s2.kind === "player" ||
+    s3.kind === "player" ||
+    sb.kind === "player";
+
+  // Jos yksikään slot ei ole asetettu tiettyyn pelaajaan,
+  // näytä kaikki pelaajat jotka ovat kentällä (start_base !== null)
+  if (!hasPlayerSlot) {
+    return row.start_base !== null;
+  }
+
+  // Jos jokin slot on asetettu tiettyyn pelaajaan,
+  // näytä vain matchaavat pelaajat kyseisessä roolissaan
+  const isRunner1 = pid === row.effective_start_runner_1b || row.start_base === 1;
+  const isRunner2 = pid === row.effective_start_runner_2b || row.start_base === 2;
+  const isRunner3 = pid === row.effective_start_runner_3b || row.start_base === 3;
+  const isBatter = pid === row.batter_id || row.start_base === 0 || row.role_at_start === "batter";
+
+  if (isRunner1 && s1.kind === "player" && s1.id === pid) return true;
+  if (isRunner2 && s2.kind === "player" && s2.id === pid) return true;
+  if (isRunner3 && s3.kind === "player" && s3.id === pid) return true;
+  if (isBatter && sb.kind === "player" && sb.id === pid) return true;
+
+  return false;
+}
+
 export function aggregateDistribution(
   rows: AtBatRow[] | PitchRow[],
   filters: TeamFilters,
@@ -157,6 +196,9 @@ export function aggregateDistribution(
     }
 
     if (!r.player_id) continue;
+
+    if (!isPlayerNamedOnField(r, filters)) continue;
+
     const id = r.player_id;
     if (!agg[id]) {
       agg[id] = {
