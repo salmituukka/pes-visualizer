@@ -257,6 +257,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
                     roster={roster}
                     currentValue={values[openSlot]}
                     measuredSlot={measuredSlot}
+                    disablePlayers={disablePlayers}
                     onSelect={(v) => handleSelect(openSlot, v)}
                   />
                 </div>
