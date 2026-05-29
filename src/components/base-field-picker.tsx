@@ -524,7 +524,7 @@ function SlotOptionsList({
           </>
         )}
 
-        {sortedPlayers.length === 0 && (
+        {sortedPlayers.length === 0 && !disablePlayers && (
           <p className="px-3 py-3 text-xs text-muted-foreground">Pelaajalistaa ladataan…</p>
         )}
       </CommandList>
