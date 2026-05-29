@@ -171,7 +171,7 @@ function rowSlot(row: AtBatRow | PitchRow): SlotKey | null {
     case 3:
       return "runner3";
     default:
-      return row.role_at_start === "batter" ? "batter" : null;
+      return null;
   }
 }
 
