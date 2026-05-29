@@ -47,6 +47,7 @@ type Props = {
   teamId?: number;
   seasonSeriesId?: number;
   hitNumber?: string;
+  matchId?: number;
 };
 
 const COLOR_MAP: Record<PitchPoint["outcome_color"], string> = {
@@ -79,7 +80,7 @@ function matchesBatterSlot(filter: string, value: number | null): boolean {
   return true;
 }
 
-export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber }: Props) {
+export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber, matchId }: Props) {
 
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
   const isMobile = useIsMobile();
@@ -109,6 +110,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
   const filteredPoints = useMemo(() => {
     if (!pitchPoints) return [];
     return pitchPoints.filter((p) => {
+      if (matchId && p.match_id !== matchId) return false;
       if (!matchesRunnerSlot(values.runner1, p.start_runner_1b)) return false;
       if (!matchesRunnerSlot(values.runner2, p.start_runner_2b)) return false;
       if (!matchesRunnerSlot(values.runner3, p.start_runner_3b)) return false;
@@ -118,7 +120,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
       }
       return true;
     });
-  }, [pitchPoints, values, hitNumber]);
+  }, [pitchPoints, values, hitNumber, matchId]);
 
   const visiblePoints = filteredPoints.slice(0, MAX_POINTS);
 
