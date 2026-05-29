@@ -214,6 +214,28 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
 
       <Card>
         <CardContent className="p-4 space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Ottelu</h3>
+          <Select
+            value={search.matchId ? String(search.matchId) : "all"}
+            onValueChange={(v) =>
+              navigate({ search: (p: any) => ({ ...p, matchId: v === "all" ? undefined : Number(v) }) })
+            }
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Kaikki ottelut</SelectItem>
+              {matchOptions.map((m) => (
+                <SelectItem key={m.match_id} value={String(m.match_id)}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tavoite</h3>
           {measured === null && (
             <p className="text-xs text-muted-foreground">Aseta "Mitattava" jollekin pesälle nähdäksesi tavoitevaihtoehdot.</p>
