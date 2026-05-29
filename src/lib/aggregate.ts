@@ -33,6 +33,7 @@ function matchesSlot(slotValue: string, actual: number | null): boolean {
   const s = parseSlot(slotValue);
   switch (s.kind) {
     case "any":
+      return actual !== null;
     case "any_or_none":
     case "measured":
       return true;
