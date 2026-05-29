@@ -26,9 +26,9 @@ import { hasMeasured, type TeamFilters } from "@/lib/filters";
 const searchSchema = z.object({
   seasonSeriesId: fallback(z.coerce.number(), 0).default(0),
   groupId: fallback(z.coerce.number().optional(), undefined),
-  runner1: fallback(z.string(), "any").default("any"),
-  runner2: fallback(z.string(), "any").default("any"),
-  runner3: fallback(z.string(), "any").default("any"),
+  runner1: fallback(z.string(), "any_or_none").default("any_or_none"),
+  runner2: fallback(z.string(), "any_or_none").default("any_or_none"),
+  runner3: fallback(z.string(), "any_or_none").default("any_or_none"),
   batter: fallback(z.string(), "any").default("any"),
   hitNumber: fallback(z.enum(["1", "2", "3", "any-single", "turn"]), "turn").default("turn"),
   goal: fallback(z.enum(["lead_advance", "tail_advance", "no_outs"]), "lead_advance").default("lead_advance"),
