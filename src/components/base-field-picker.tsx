@@ -369,6 +369,7 @@ function SlotPopoverAnchor({
   roster,
   currentValue,
   measuredSlot,
+  disablePlayers,
   onSelect,
 }: {
   slot: SlotKey;
@@ -377,10 +378,10 @@ function SlotPopoverAnchor({
   roster: RosterPlayer[];
   currentValue: string;
   measuredSlot: SlotKey | undefined;
+  disablePlayers?: boolean;
   onSelect: (v: string) => void;
 }) {
   const { cx, cy } = SLOT_POS[slot];
-  // Muutetaan SVG-koordinaatit prosenteiksi konteinerista (viewBox 57x113)
   const leftPct = (cx / 57) * 100;
   const topPct = (cy / 113) * 100;
 
@@ -409,6 +410,7 @@ function SlotPopoverAnchor({
             roster={roster}
             currentValue={currentValue}
             measuredSlot={measuredSlot}
+            disablePlayers={disablePlayers}
             onSelect={onSelect}
           />
         </PopoverContent>
@@ -426,12 +428,14 @@ function SlotOptionsList({
   roster,
   currentValue,
   measuredSlot,
+  disablePlayers,
   onSelect,
 }: {
   slot: SlotKey;
   roster: RosterPlayer[];
   currentValue: string;
   measuredSlot: SlotKey | undefined;
+  disablePlayers?: boolean;
   onSelect: (v: string) => void;
 }) {
   const isBatter = slot === "batter";
@@ -444,17 +448,22 @@ function SlotOptionsList({
     baseOptions.push({ value: "none", label: "Ei kukaan" });
     baseOptions.push({ value: "any_or_none", label: "Kuka tahansa tai ei kukaan" });
   }
-  baseOptions.push({
-    value: "measured",
-    label: "Mitattava",
-    disabled: measuredDisabled,
-    note: measuredDisabled ? `Mitattava on jo asetettu (${SLOT_LABEL[measuredSlot!]})` : undefined,
-  });
+  if (!disablePlayers) {
+    baseOptions.push({
+      value: "measured",
+      label: "Mitattava",
+      disabled: measuredDisabled,
+      note: measuredDisabled ? `Mitattava on jo asetettu (${SLOT_LABEL[measuredSlot!]})` : undefined,
+    });
+  }
 
-  // Pelaajat: Sukunimi Etunimi -järjestys
-  const sortedPlayers = roster
-    .filter((player) => (player.full_name ?? "").trim().length > 0)
-    .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
+  // Pelaajat: Sukunimi Etunimi -järjestys (piilotetaan ulkopelissä)
+  const sortedPlayers = disablePlayers
+    ? []
+    : roster
+        .filter((player) => (player.full_name ?? "").trim().length > 0)
+        .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
+
 
   return (
     <Command className="h-full max-h-[min(70vh,500px)]">
