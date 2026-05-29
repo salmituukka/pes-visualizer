@@ -286,21 +286,22 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
 
   const rankingRows = useMemo(() => {
     if (measured === null) return [];
-    if (usePitch) return pitchRows ? aggregatePitchStats(pitchRows as any, search) : [];
-    return atBatRows ? aggregateAtBatStats(atBatRows as any, search) : [];
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return filteredPitchRows ? aggregatePitchStats(filteredPitchRows as any, search) : [];
+    return filteredAtBatRows ? aggregateAtBatStats(filteredAtBatRows as any, search) : [];
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
 
   const distributionRows = useMemo(() => {
     if (measured !== null) return [];
-    if (usePitch) return pitchRows ? aggregateDistribution(pitchRows as any, search, "pitch") : [];
-    return atBatRows ? aggregateDistribution(atBatRows as any, search, "at_bat") : [];
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return filteredPitchRows ? aggregateDistribution(filteredPitchRows as any, search, "pitch") : [];
+    return filteredAtBatRows ? aggregateDistribution(filteredAtBatRows as any, search, "at_bat") : [];
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
 
   const expected = useMemo(() => {
     if (measured !== null) return { n: 0, runs: 0, leadAdvance: 0, tailAdvance: 0, wounded: 0, leadOuts: 0, tailOuts: 0 };
-    if (usePitch) return aggregateExpectedValues((pitchRows ?? []) as any, search, "pitch");
-    return aggregateExpectedValues((atBatRows ?? []) as any, search, "at_bat");
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return aggregateExpectedValues((filteredPitchRows ?? []) as any, search, "pitch");
+    return aggregateExpectedValues((filteredAtBatRows ?? []) as any, search, "at_bat");
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
+
 
   if (a1 || a2) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
 
