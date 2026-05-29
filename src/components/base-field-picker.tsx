@@ -62,6 +62,7 @@ function matchesRunnerSlot(filter: string, value: number | null): boolean {
   const p = parseSlot(filter);
   switch (p.kind) {
     case "any":
+      return value !== null;
     case "any_or_none":
     case "measured":
       return true;
