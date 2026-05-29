@@ -271,8 +271,18 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     enabled: usePitch && seasonSeriesId > 0,
   });
 
+  const filteredAtBatRows = useMemo(
+    () => (search.matchId ? (atBatRows ?? []).filter((r: any) => r.match_id === search.matchId) : atBatRows),
+    [atBatRows, search.matchId],
+  );
+  const filteredPitchRows = useMemo(
+    () => (search.matchId ? (pitchRows ?? []).filter((r: any) => r.match_id === search.matchId) : pitchRows),
+    [pitchRows, search.matchId],
+  );
+
   const measured = hasMeasured(search);
-  const totalEvents = (atBatRows?.length ?? 0) + (pitchRows?.length ?? 0);
+  const totalEvents = (filteredAtBatRows?.length ?? 0) + (filteredPitchRows?.length ?? 0);
+
 
   const rankingRows = useMemo(() => {
     if (measured === null) return [];
