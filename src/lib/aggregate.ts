@@ -1,6 +1,11 @@
 import { parseSlot, hasMeasured, type TeamFilters } from "./filters";
 
 type AtBatRow = {
+  match_id: number | null;
+  period: number | null;
+  inning: number | null;
+  bat_turn: number | null;
+  at_bat_in_inning: number | null;
   team_id: number | null;
   player_id: number | null;
   batter_id: number | null;
@@ -26,6 +31,86 @@ type PitchRow = AtBatRow & {
   start_runner_2b: number | null;
   start_runner_3b: number | null;
 };
+
+export type ExpectedValues = {
+  n: number;
+  runs: number;
+  leadAdvance: number;
+  tailAdvance: number;
+  wounded: number;
+  leadOuts: number;
+  tailOuts: number;
+};
+
+export function aggregateExpectedValues(
+  rows: AtBatRow[] | PitchRow[],
+  filters: TeamFilters,
+  level: "at_bat" | "pitch",
+): ExpectedValues {
+  type Group = {
+    r1: number | null;
+    r2: number | null;
+    r3: number | null;
+    batterId: number | null;
+    rows: (AtBatRow | PitchRow)[];
+  };
+  const groups = new Map<string, Group>();
+
+  for (const r of rows) {
+    const hitPart = level === "pitch" ? (r as PitchRow).hit_number ?? "" : "";
+    const key = `${r.match_id}|${r.period}|${r.inning}|${r.bat_turn}|${r.at_bat_in_inning}|${hitPart}`;
+    let g = groups.get(key);
+    if (!g) {
+      const r1 = level === "pitch" ? (r as PitchRow).start_runner_1b : r.effective_start_runner_1b;
+      const r2 = level === "pitch" ? (r as PitchRow).start_runner_2b : r.effective_start_runner_2b;
+      const r3 = level === "pitch" ? (r as PitchRow).start_runner_3b : r.effective_start_runner_3b;
+      g = { r1, r2, r3, batterId: r.batter_id, rows: [] };
+      groups.set(key, g);
+    }
+    g.rows.push(r);
+  }
+
+  const out: ExpectedValues = {
+    n: 0,
+    runs: 0,
+    leadAdvance: 0,
+    tailAdvance: 0,
+    wounded: 0,
+    leadOuts: 0,
+    tailOuts: 0,
+  };
+
+  for (const g of groups.values()) {
+    if (!matchesFilters(filters, g.r1, g.r2, g.r3, g.batterId)) continue;
+    if (level === "pitch") {
+      const hitNum = filters.hitNumber;
+      if (hitNum === "1" || hitNum === "2" || hitNum === "3") {
+        const hn = (g.rows[0] as PitchRow).hit_number;
+        if (hn !== Number(hitNum)) continue;
+      }
+    }
+    out.n += 1;
+    for (const p of g.rows) {
+      const isLead = p.role_at_start === "lead_runner";
+      const isTail = p.role_at_start === "tail_runner" || p.role_at_start === "batter";
+
+      if (p.end_base === 4) out.runs += 1;
+
+      if (p.got_wounded) out.wounded += 1;
+
+      if (p.got_out || p.end_base === -1) {
+        if (isLead) out.leadOuts += 1;
+        else if (isTail) out.tailOuts += 1;
+      } else if (!p.got_wounded && p.start_base !== null && p.end_base !== null && p.end_base >= 0) {
+        const adv = Math.max(0, p.end_base - p.start_base);
+        if (isLead) out.leadAdvance += adv;
+        else if (isTail) out.tailAdvance += adv;
+      }
+    }
+  }
+
+  return out;
+}
 
 type Aggregated = Record<number, { full_name: string; successes: number; attempts: number }>;
 
