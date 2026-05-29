@@ -307,3 +307,105 @@ export const pitchPointsQueryOptions = (team_id: number, season_series_id: numbe
     staleTime: 60 * 1000,
   });
 
+// ============================================================================
+// Opponent (ulkopeli) queries — joukkueen otteluissa vastustajan rivit
+// ============================================================================
+
+const OPP_CHUNK = 200;
+function oppChunked<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+export const opponentAtBatParticipantsQueryOptions = (
+  team_id: number,
+  season_series_id: number,
+  match_ids: number[],
+) =>
+  queryOptions({
+    queryKey: ["opp-v-at-bat", team_id, season_series_id, match_ids],
+    queryFn: async () => {
+      if (match_ids.length === 0) return [] as any[];
+      const results: any[] = [];
+      for (const ids of oppChunked(match_ids, OPP_CHUNK)) {
+        const data = await fetchAllPaged<any>((from, to) =>
+          supabase
+            .from("v_at_bat_participants_with_goals")
+            .select(
+              "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, had_hit_advance, had_error_advance, had_steal, had_walk, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs"
+            )
+            .in("match_id", ids)
+            .neq("team_id", team_id)
+            .range(from, to),
+        );
+        results.push(...data);
+      }
+      return results;
+    },
+    staleTime: 30 * 1000,
+  });
+
+export const opponentPitchParticipantsQueryOptions = (
+  team_id: number,
+  season_series_id: number,
+  match_ids: number[],
+) =>
+  queryOptions({
+    queryKey: ["opp-v-pitch", team_id, season_series_id, match_ids],
+    queryFn: async () => {
+      if (match_ids.length === 0) return [] as any[];
+      const results: any[] = [];
+      for (const ids of oppChunked(match_ids, OPP_CHUNK)) {
+        const data = await fetchAllPaged<any>((from, to) =>
+          supabase
+            .from("v_pitch_participants_with_goals")
+            .select(
+              "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, team_id, player_id, batter_id, role_at_start, start_base, end_base, start_runner_1b, start_runner_2b, start_runner_3b, had_hit_advance, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs"
+            )
+            .in("match_id", ids)
+            .neq("team_id", team_id)
+            .range(from, to),
+        );
+        results.push(...data);
+      }
+      return results;
+    },
+    staleTime: 30 * 1000,
+  });
+
+export const opponentPitchPointsQueryOptions = (
+  team_id: number,
+  season_series_id: number,
+  match_ids: number[],
+) =>
+  queryOptions({
+    queryKey: ["opp-pitch-points", team_id, season_series_id, match_ids],
+    queryFn: async (): Promise<PitchPoint[]> => {
+      if (match_ids.length === 0) return [];
+      const results: any[] = [];
+      for (const ids of oppChunked(match_ids, OPP_CHUNK)) {
+        const data = await fetchAllPaged<any>((from, to) =>
+          supabase
+            .from("v_pitches_with_outcome_color")
+            .select(
+              "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
+            )
+            .in("match_id", ids)
+            .neq("team_id", team_id)
+            .range(from, to),
+        );
+        results.push(...data);
+      }
+      return results.filter(
+        (r) =>
+          r.match_id != null &&
+          r.x != null &&
+          r.y != null &&
+          r.outcome_color != null,
+      ) as PitchPoint[];
+    },
+    staleTime: 60 * 1000,
+  });
+
+

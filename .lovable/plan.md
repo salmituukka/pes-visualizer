@@ -1,61 +1,74 @@
-## Tavoite
+## Ulkopelinäkymä joukkueen sivulle
 
-Korvaa nykyinen "Lukumäärät"-taulukko (jakaumanäkymässä, eli kun mitattavaa ei ole valittu) "Odotusarvot"-taulukolla. Stacked-pylväs ja "Lopputilojen jakauma" -kortti säilyvät ennallaan.
+Lisätään joukkuesivulle Sisäpeli ↔ Ulkopeli -toggle. Ulkopelitilassa katsotaan
+lyöntivuoroja, joissa **vastustaja** on lyömässä joukkueen otteluissa. Mitattava-
+moodi ei ole käytössä, joten näytetään aina lopputilajakauma, odotusarvotaulukko
+ja lyöntikartta.
 
-## Taulukon sisältö
+### Käyttöliittymä
 
-Yksi rivi, kuusi saraketta:
+- Headerin otsikko: "Joukkueen nimi – Sisäpeli" / "– Ulkopeli". Otsikon viereen
+  kompakti toggle (kaksi nappia: Sisäpeli | Ulkopeli).
+- Toggle tallennetaan URL-paramiin `mode=offense|defense` (oletus `offense` =
+  nykyinen sisäpelinäkymä). Muut suodattimet säilyvät vaihdossa, paitsi ne
+  jotka eivät ole ulkopelissä mahdollisia (mitattava-arvot nollataan).
 
-| Juoksut | Kärkietenemiset | Takaetenemiset | Haavoittumiset | Kärkipalot | Takapalot |
+### Suodattimet ulkopelitilassa
 
-Arvot per ottelutapahtuma (lyöntinumero-tilassa per lyönti, lyöntivuoro-tilassa per lyöntivuoro). Näytä kaksi desimaalia.
+- **Pesätilanne**: vain "Kuka tahansa" / "Ei kukaan" / "Kuka tahansa tai ei
+  kukaan". Pelaajavalinta ja "Mitattava" piilotetaan kaikilta pesiltä ja
+  lyöjältä. Jos URL:ssä on pelaaja-id tai `measured`, ne käsitellään kuten
+  "Kuka tahansa".
+- **Lyöntinumero**: sama kuin nyt (Lyöntivuoro / 1. / 2. / 3. / Mikä tahansa
+  yksittäinen).
+- **Ottelu**: sama suodatin.
+- **Tavoite-kortti**: piilotetaan kokonaan (ei käytössä ilman mitattavaa).
 
-Yläpuolelle "n = X tapahtumaa" -kuvaus.
+### Visualisaatio
 
-## Laskentalogiikka
+Aina "Mitattavaa ei valittu" -tila → näytetään:
+1. **Lyöntikartta** (vastustajan lyönnit, joukkueen otteluista). Sama
+   `pitchPointsQueryOptions`-rakenne, mutta haetaan ottelusta kaikki rivit,
+   joiden `team_id ≠ teamId` ja `match` kuuluu joukkueen otteluihin.
+2. **Lopputilajakauma** (`DistributionDisplay`).
+3. **Odotusarvotaulukko** (`aggregateExpectedValues` → sama komponentti).
 
-Nimittäjä N = distinct-ottelutapahtumien määrä, jotka täyttävät nykyiset pesätilanne- ja lyöntinumero-suodattimet.
-- at_bat-tasolla: distinct (match_id, period, inning, bat_turn, at_bat_in_inning) suodatuksen jälkeen
-- pitch-tasolla: distinct (..., hit_number) suodatuksen jälkeen
+Mitattava-tilan ranking-näkymää (`StatsDisplay`) ei renderöidä.
 
-Osallistujarivien suodatus tehdään tapahtumatasolla: tapahtuma kelpaa jos sen pesätilanne (r1/r2/r3) ja batter täyttävät suodattimet ja lyöntinumero osuu (pitch-tasolla).
+### Tekninen toteutus
 
-Per kelpaava tapahtuma, summataan kaikki osallistujarivit kyseiselle tapahtumalle:
+- **Reitti**: pysyy `/team/$teamId`. Lisätään `mode` searchSchemaan:
+  `mode: fallback(z.enum(["offense","defense"]), "offense").default("offense")`.
+- **Toggle**: pieni `Tabs`- tai kaksi-`Button`-komponentti headerissa, päivittää
+  `mode`-paramin ja tarvittaessa nollaa pelaaja-ID:t / "measured"-arvot
+  ulkopelitilaan vaihdettaessa.
+- **Datakyselyt** (`src/lib/queries.ts`): lisätään uudet variantit, jotka
+  hakevat saman season_series_id:n datan, mutta:
+  - haetaan ensin joukkueen `match_id`-lista (`teamMatchesQueryOptions` jo
+    olemassa) ja filtteröidään näkymäkyselyt `.in("match_id", matchIds)` +
+    `.neq("team_id", teamId)`.
+  - Uudet `queryOptions`: `opponentAtBatParticipantsQueryOptions`,
+    `opponentPitchParticipantsQueryOptions`, `opponentPitchPointsQueryOptions`.
+  - Query keyt esim. `["opp-v-at-bat", teamId, seasonSeriesId]` jotta
+    cache ei sotkeudu sisäpelin kanssa.
+- **`StatsSection`-komponentti**: lisätään `mode`-prop. Kun `defense`:
+  - Käytetään opponent-kyselyitä.
+  - Pakotetaan `measured = null` riippumatta URL-tilasta → aina
+    `DistributionDisplay`.
+  - `BaseFieldPicker`iin uusi `disablePlayers`-prop, joka piilottaa
+    pelaajavalinnan ja Mitattava-vaihtoehdon dropdowneista; jos slotissa on
+    pelaaja-id tai `measured`, käsitellään `any_or_none` / `any`:na.
+- **Roster/sync**: pelaajien synkronointi tarvitaan vain sisäpelissä; ulkopeli
+  ei tarvitse omaa rosteria. Ottelutapahtumat parsitaan joka tapauksessa
+  joukkueen otteluista, joten ulkopelitila näkee saman datan automaattisesti
+  kun sisäpelitila on käynyt sivulla.
+- **Aggregointi** (`src/lib/aggregate.ts`): käyttää samoja funktioita; ne eivät
+  oleta team_id:ta — riittää, että rivit on filtteröity oikein
+  query-tasolla. Tämä varmistetaan testaamalla, ettei `aggregate*`-funktiot
+  viittaa `teamId`-arvoon (nopea katsaus).
 
-- **Juoksut**: count(end_base = 4)
-- **Kärkietenemiset**: sum yli role_at_start = 'lead_runner' osallistujista, max(0, end_base − start_base). Palanut (end_base = -1) → 0. Haavoittunut → 0.
-- **Takaetenemiset**: sama kaava mutta role_at_start ∈ ('tail_runner', 'batter'). Lyöjä siis lasketaan AINA takaetenijäksi etenemis-laskussa — huom: lyöjä voi olla myös lead_runner; molemmat roolit voivat esiintyä, koska eri osallistujariveillä on omat roolinsa. Käytetään puhtaasti role_at_start-arvoa.
-- **Haavoittumiset**: count(got_wounded = true)
-- **Kärkipalot**: count(got_out = true AND role_at_start = 'lead_runner')
-- **Takapalot**: count(got_out = true AND role_at_start ∈ ('tail_runner', 'batter'))
+### Mitä EI muuteta
 
-Odotusarvo = summa / N. Jos N = 0 → näytä "—".
-
-## Tekninen toteutus
-
-**src/lib/aggregate.ts**
-- Lisää uusi tyyppi `ExpectedValues = { n: number; runs: number; leadAdvance: number; tailAdvance: number; wounded: number; leadOuts: number; tailOuts: number }`.
-- Lisää funktio `aggregateExpectedValues(rows, filters, level)`:
-  - Ryhmittele rivit tapahtuma-avaimella (`match_id|period|inning|bat_turn|at_bat_in_inning` + tarvittaessa `hit_number`).
-  - Tarkista kunkin ryhmän pesätilanne (otetaan ensimmäiseltä riviltä) `matchesFilters`-funktiolla, ja pitch-tilassa hit_number-suodatin.
-  - Jos kelpaa, kasvata N ja kerää summat yllä olevan logiikan mukaan kaikilta ryhmän osallistujariveiltä.
-- Päivitä `AtBatRow`/`PitchRow`-tyypit sisältämään tapahtuma-avaimen kentät (match_id, period, inning, bat_turn, at_bat_in_inning, hit_number).
-
-**src/lib/queries.ts**
-- Varmista että `atBatParticipantsQueryOptions` ja `pitchParticipantsQueryOptions` valitsevat tapahtuma-avaimen sarakkeet (jos eivät vielä).
-
-**src/components/distribution-display.tsx**
-- Lisää uusi propsi `expected: ExpectedValues`.
-- Korvaa "Lukumäärät"-kortti "Odotusarvot"-kortilla:
-  - Otsikko: "Odotusarvot" + alaotsikko "per lyönti" tai "per lyöntivuoro" sen mukaan kumpaa dataa katsotaan
-  - Taulukko 6 sarakkeella, kukin arvo 2 desimaalin tarkkuudella; `—` jos n = 0
-  - Pieni "n = X" -teksti
-
-**src/routes/team.$teamId.tsx**
-- Laske `expected` `useMemo`:ssa kuten `distributionRows`, ja välitä `DistributionDisplay`:lle. Lisää `level`-tieto otsikon yksikön valintaa varten.
-
-## Mitä ei muuteta
-
-- "Lopputilojen jakauma" -kortti (stacked-pylväät) jää ennalleen.
-- Ranking-näkymä (StatsDisplay, mitattava valittuna) jää ennalleen.
-- Ei tietokantamuutoksia.
+- Sisäpelinäkymä ja sen URL-yhteensopivuus.
+- Aggregointilogiikka.
+- Match-sync-virtaus (ulkopeli käyttää samaa parsittua dataa).

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
-import { pitchPointsQueryOptions, type PitchPoint } from "@/lib/queries";
+import { pitchPointsQueryOptions, opponentPitchPointsQueryOptions, type PitchPoint } from "@/lib/queries";
+
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -48,7 +49,12 @@ type Props = {
   seasonSeriesId?: number;
   hitNumber?: string;
   matchId?: number;
+  /** Ulkopelissä: piilotetaan pelaajavalinnat ja "Mitattava". */
+  disablePlayers?: boolean;
+  /** Ulkopelissä: lyöntikartta haetaan näistä otteluista, vastustajan tiimin riveistä. */
+  opponentMatchIds?: number[];
 };
+
 
 const COLOR_MAP: Record<PitchPoint["outcome_color"], string> = {
   red: "#dc2626",
@@ -80,7 +86,7 @@ function matchesBatterSlot(filter: string, value: number | null): boolean {
   return true;
 }
 
-export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber, matchId }: Props) {
+export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber, matchId, disablePlayers, opponentMatchIds }: Props) {
 
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
   const isMobile = useIsMobile();
@@ -102,10 +108,16 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
   const playersById = new Map(roster.map((p) => [p.player_id, p]));
 
   const enabled = !!teamId && !!seasonSeriesId && teamId > 0 && seasonSeriesId > 0;
-  const { data: pitchPoints } = useQuery({
+  const offensePoints = useQuery({
     ...pitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0),
-    enabled,
+    enabled: enabled && !disablePlayers,
   });
+  const defensePoints = useQuery({
+    ...opponentPitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0, opponentMatchIds ?? []),
+    enabled: enabled && !!disablePlayers && (opponentMatchIds?.length ?? 0) > 0,
+  });
+  const pitchPoints = disablePlayers ? defensePoints.data : offensePoints.data;
+
 
   const filteredPoints = useMemo(() => {
     if (!pitchPoints) return [];
@@ -193,6 +205,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
               roster={roster}
               currentValue={values[slot]}
               measuredSlot={measuredSlot}
+              disablePlayers={disablePlayers}
               onSelect={(v) => handleSelect(slot, v)}
             />
           ))}
@@ -244,6 +257,7 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
                     roster={roster}
                     currentValue={values[openSlot]}
                     measuredSlot={measuredSlot}
+                    disablePlayers={disablePlayers}
                     onSelect={(v) => handleSelect(openSlot, v)}
                   />
                 </div>
@@ -355,6 +369,7 @@ function SlotPopoverAnchor({
   roster,
   currentValue,
   measuredSlot,
+  disablePlayers,
   onSelect,
 }: {
   slot: SlotKey;
@@ -363,10 +378,10 @@ function SlotPopoverAnchor({
   roster: RosterPlayer[];
   currentValue: string;
   measuredSlot: SlotKey | undefined;
+  disablePlayers?: boolean;
   onSelect: (v: string) => void;
 }) {
   const { cx, cy } = SLOT_POS[slot];
-  // Muutetaan SVG-koordinaatit prosenteiksi konteinerista (viewBox 57x113)
   const leftPct = (cx / 57) * 100;
   const topPct = (cy / 113) * 100;
 
@@ -395,6 +410,7 @@ function SlotPopoverAnchor({
             roster={roster}
             currentValue={currentValue}
             measuredSlot={measuredSlot}
+            disablePlayers={disablePlayers}
             onSelect={onSelect}
           />
         </PopoverContent>
@@ -412,12 +428,14 @@ function SlotOptionsList({
   roster,
   currentValue,
   measuredSlot,
+  disablePlayers,
   onSelect,
 }: {
   slot: SlotKey;
   roster: RosterPlayer[];
   currentValue: string;
   measuredSlot: SlotKey | undefined;
+  disablePlayers?: boolean;
   onSelect: (v: string) => void;
 }) {
   const isBatter = slot === "batter";
@@ -430,17 +448,22 @@ function SlotOptionsList({
     baseOptions.push({ value: "none", label: "Ei kukaan" });
     baseOptions.push({ value: "any_or_none", label: "Kuka tahansa tai ei kukaan" });
   }
-  baseOptions.push({
-    value: "measured",
-    label: "Mitattava",
-    disabled: measuredDisabled,
-    note: measuredDisabled ? `Mitattava on jo asetettu (${SLOT_LABEL[measuredSlot!]})` : undefined,
-  });
+  if (!disablePlayers) {
+    baseOptions.push({
+      value: "measured",
+      label: "Mitattava",
+      disabled: measuredDisabled,
+      note: measuredDisabled ? `Mitattava on jo asetettu (${SLOT_LABEL[measuredSlot!]})` : undefined,
+    });
+  }
 
-  // Pelaajat: Sukunimi Etunimi -järjestys
-  const sortedPlayers = roster
-    .filter((player) => (player.full_name ?? "").trim().length > 0)
-    .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
+  // Pelaajat: Sukunimi Etunimi -järjestys (piilotetaan ulkopelissä)
+  const sortedPlayers = disablePlayers
+    ? []
+    : roster
+        .filter((player) => (player.full_name ?? "").trim().length > 0)
+        .sort((a, b) => sortableName(a.full_name).localeCompare(sortableName(b.full_name), "fi"));
+
 
   return (
     <Command className="h-full max-h-[min(70vh,500px)]">
@@ -501,7 +524,7 @@ function SlotOptionsList({
           </>
         )}
 
-        {sortedPlayers.length === 0 && (
+        {sortedPlayers.length === 0 && !disablePlayers && (
           <p className="px-3 py-3 text-xs text-muted-foreground">Pelaajalistaa ladataan…</p>
         )}
       </CommandList>
