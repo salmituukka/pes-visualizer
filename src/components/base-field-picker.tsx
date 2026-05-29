@@ -49,7 +49,12 @@ type Props = {
   seasonSeriesId?: number;
   hitNumber?: string;
   matchId?: number;
+  /** Ulkopelissä: piilotetaan pelaajavalinnat ja "Mitattava". */
+  disablePlayers?: boolean;
+  /** Ulkopelissä: lyöntikartta haetaan näistä otteluista, vastustajan tiimin riveistä. */
+  opponentMatchIds?: number[];
 };
+
 
 const COLOR_MAP: Record<PitchPoint["outcome_color"], string> = {
   red: "#dc2626",
