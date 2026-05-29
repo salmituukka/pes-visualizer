@@ -232,7 +232,6 @@ export function aggregateDistribution(
     const a = agg[slot]!;
     a.total += 1;
 
-    a.total += 1;
 
     if (r.got_out || r.end_base === -1) a.out += 1;
     else if (r.got_wounded) a.wounded += 1;
