@@ -183,6 +183,7 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
             teamId={teamId}
             seasonSeriesId={seasonSeriesId}
             hitNumber={search.hitNumber}
+            matchId={search.matchId}
           />
         </CardContent>
       </Card>
