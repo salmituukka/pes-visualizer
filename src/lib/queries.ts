@@ -153,6 +153,12 @@ export const teamQueryOptions = (team_id: number) =>
       if (error) throw error;
       return data;
     },
+  });
+
+export const teamRosterQueryOptions = (team_id: number, season_series_id: number) =>
+  queryOptions({
+    queryKey: ["team-roster", team_id, season_series_id],
+    queryFn: async () => {
       const [atBatData, pitchData] = await Promise.all([
         fetchAllPaged<{ player_id: number | null }>((from, to) =>
           supabase
@@ -237,42 +243,20 @@ export const atBatParticipantsQueryOptions = (team_id: number, season_series_id:
     staleTime: 30 * 1000,
   });
 
-// ============================================================================
-// Stats — vuorotason (at_bat) ja lyöntitason (pitch)
-// ============================================================================
-
-export const atBatParticipantsQueryOptions = (team_id: number, season_series_id: number) =>
-  queryOptions({
-    queryKey: ["v-at-bat", team_id, season_series_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_at_bat_participants_with_goals")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, had_hit_advance, had_error_advance, had_steal, had_walk, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!at_bat_participants_player_id_fkey(full_name)"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(50000);
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 30 * 1000,
-  });
-
 export const pitchParticipantsQueryOptions = (team_id: number, season_series_id: number) =>
   queryOptions({
     queryKey: ["v-pitch", team_id, season_series_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_pitch_participants_with_goals")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, team_id, player_id, batter_id, role_at_start, start_base, end_base, start_runner_1b, start_runner_2b, start_runner_3b, had_hit_advance, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!pitch_participants_player_id_fkey(full_name)"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(100000);
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("v_pitch_participants_with_goals")
+          .select(
+            "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, team_id, player_id, batter_id, role_at_start, start_base, end_base, start_runner_1b, start_runner_2b, start_runner_3b, had_hit_advance, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!pitch_participants_player_id_fkey(full_name)"
+          )
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .range(from, to),
+      );
     },
     staleTime: 30 * 1000,
   });
@@ -301,16 +285,17 @@ export const pitchPointsQueryOptions = (team_id: number, season_series_id: numbe
   queryOptions({
     queryKey: ["pitch-points", team_id, season_series_id],
     queryFn: async (): Promise<PitchPoint[]> => {
-      const { data, error } = await supabase
-        .from("v_pitches_with_outcome_color")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(50000);
-      if (error) throw error;
-      return (data ?? []).filter(
+      const data = await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("v_pitches_with_outcome_color")
+          .select(
+            "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
+          )
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .range(from, to),
+      );
+      return data.filter(
         (r) =>
           r.match_id != null &&
           r.x != null &&
