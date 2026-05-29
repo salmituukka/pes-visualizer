@@ -1,6 +1,25 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// Supabase PostgREST rajoittaa oletuksena palautuksen 1000 riviin riippumatta
+// .limit()-arvosta. Tämä helpperi sivuttaa kyselyn .range()-kutsuilla.
+async function fetchAllPaged<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 // ============================================================================
 // Series / seasons / groups
 // ============================================================================
@@ -140,27 +159,28 @@ export const teamRosterQueryOptions = (team_id: number, season_series_id: number
   queryOptions({
     queryKey: ["team-roster", team_id, season_series_id],
     queryFn: async () => {
-      const [atBatResult, pitchResult] = await Promise.all([
-        supabase
-          .from("v_at_bat_participants_with_goals")
-          .select("player_id")
-          .eq("team_id", team_id)
-          .eq("season_series_id", season_series_id)
-          .limit(10000),
-        supabase
-          .from("v_pitch_participants_with_goals")
-          .select("player_id")
-          .eq("team_id", team_id)
-          .eq("season_series_id", season_series_id)
-          .limit(10000),
+      const [atBatData, pitchData] = await Promise.all([
+        fetchAllPaged<{ player_id: number | null }>((from, to) =>
+          supabase
+            .from("v_at_bat_participants_with_goals")
+            .select("player_id")
+            .eq("team_id", team_id)
+            .eq("season_series_id", season_series_id)
+            .range(from, to),
+        ),
+        fetchAllPaged<{ player_id: number | null }>((from, to) =>
+          supabase
+            .from("v_pitch_participants_with_goals")
+            .select("player_id")
+            .eq("team_id", team_id)
+            .eq("season_series_id", season_series_id)
+            .range(from, to),
+        ),
       ]);
-
-      if (atBatResult.error) throw atBatResult.error;
-      if (pitchResult.error) throw pitchResult.error;
 
       const playerIds = Array.from(
         new Set(
-          [...(atBatResult.data ?? []), ...(pitchResult.data ?? [])]
+          [...atBatData, ...pitchData]
             .map((row) => row.player_id)
             .filter((playerId): playerId is number => typeof playerId === "number"),
         ),
@@ -168,15 +188,16 @@ export const teamRosterQueryOptions = (team_id: number, season_series_id: number
 
       if (playerIds.length === 0) return [];
 
-      const { data: players, error: playersError } = await supabase
-        .from("players")
-        .select("player_id, full_name, image_url")
-        .in("player_id", playerIds)
-        .limit(10000);
+      const players = await fetchAllPaged<{ player_id: number; full_name: string | null; image_url: string | null }>(
+        (from, to) =>
+          supabase
+            .from("players")
+            .select("player_id, full_name, image_url")
+            .in("player_id", playerIds)
+            .range(from, to),
+      );
 
-      if (playersError) throw playersError;
-
-      return (players ?? [])
+      return players
         .filter((player) => (player.full_name ?? "").trim().length > 0)
         .sort((a, b) => a.full_name!.localeCompare(b.full_name!, "fi"));
     },
@@ -187,14 +208,15 @@ export const teamMatchesQueryOptions = (team_id: number, season_series_id: numbe
   queryOptions({
     queryKey: ["team-matches", team_id, season_series_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("season_series_id", season_series_id)
-        .or(`home_team_id.eq.${team_id},away_team_id.eq.${team_id}`)
-        .order("match_date", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("matches")
+          .select("*")
+          .eq("season_series_id", season_series_id)
+          .or(`home_team_id.eq.${team_id},away_team_id.eq.${team_id}`)
+          .order("match_date", { ascending: false })
+          .range(from, to),
+      );
     },
     staleTime: 30 * 1000,
   });
@@ -207,16 +229,16 @@ export const atBatParticipantsQueryOptions = (team_id: number, season_series_id:
   queryOptions({
     queryKey: ["v-at-bat", team_id, season_series_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_at_bat_participants_with_goals")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, had_hit_advance, had_error_advance, had_steal, had_walk, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!at_bat_participants_player_id_fkey(full_name)"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(50000);
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("v_at_bat_participants_with_goals")
+          .select(
+            "match_id, period, inning, bat_turn, at_bat_in_inning, team_id, player_id, batter_id, role_at_start, start_base, end_base, effective_start_runner_1b, effective_start_runner_2b, effective_start_runner_3b, had_hit_advance, had_error_advance, had_steal, had_walk, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!at_bat_participants_player_id_fkey(full_name)"
+          )
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .range(from, to),
+      );
     },
     staleTime: 30 * 1000,
   });
@@ -225,16 +247,16 @@ export const pitchParticipantsQueryOptions = (team_id: number, season_series_id:
   queryOptions({
     queryKey: ["v-pitch", team_id, season_series_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_pitch_participants_with_goals")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, team_id, player_id, batter_id, role_at_start, start_base, end_base, start_runner_1b, start_runner_2b, start_runner_3b, had_hit_advance, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!pitch_participants_player_id_fkey(full_name)"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(100000);
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("v_pitch_participants_with_goals")
+          .select(
+            "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, team_id, player_id, batter_id, role_at_start, start_base, end_base, start_runner_1b, start_runner_2b, start_runner_3b, had_hit_advance, got_out, got_wounded, goal_lead_advance, goal_tail_advance_runner, goal_tail_advance_batter, goal_no_outs, players!pitch_participants_player_id_fkey(full_name)"
+          )
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .range(from, to),
+      );
     },
     staleTime: 30 * 1000,
   });
@@ -263,16 +285,17 @@ export const pitchPointsQueryOptions = (team_id: number, season_series_id: numbe
   queryOptions({
     queryKey: ["pitch-points", team_id, season_series_id],
     queryFn: async (): Promise<PitchPoint[]> => {
-      const { data, error } = await supabase
-        .from("v_pitches_with_outcome_color")
-        .select(
-          "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
-        )
-        .eq("team_id", team_id)
-        .eq("season_series_id", season_series_id)
-        .limit(50000);
-      if (error) throw error;
-      return (data ?? []).filter(
+      const data = await fetchAllPaged<any>((from, to) =>
+        supabase
+          .from("v_pitches_with_outcome_color")
+          .select(
+            "match_id, period, inning, bat_turn, at_bat_in_inning, hit_number, batter_id, x, y, outcome_color, start_runner_1b, start_runner_2b, start_runner_3b"
+          )
+          .eq("team_id", team_id)
+          .eq("season_series_id", season_series_id)
+          .range(from, to),
+      );
+      return data.filter(
         (r) =>
           r.match_id != null &&
           r.x != null &&
