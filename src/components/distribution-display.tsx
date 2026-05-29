@@ -113,28 +113,17 @@ export function DistributionDisplay({
           </p>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  {cols.map((c) => (
-                    <th key={c.label} className="pb-2 text-right first:text-left">
-                      {c.label}
-                    </th>
-                  ))}
+          <table className="w-full text-sm">
+            <tbody>
+              {cols.map((c, i) => (
+                <tr key={c.label} className={i < cols.length - 1 ? "border-b" : ""}>
+                  <td className="py-2 pr-2 text-muted-foreground">{c.label}</td>
+                  <td className="py-2 text-right tabular-nums font-medium">{fmt(c.value)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {cols.map((c) => (
-                    <td key={c.label} className="py-2 text-right tabular-nums first:text-left">
-                      {fmt(c.value)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
+
         </CardContent>
       </Card>
     </div>
