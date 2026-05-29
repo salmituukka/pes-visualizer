@@ -8,7 +8,7 @@ const SEGMENTS: { key: keyof DistributionRow; color: string; label: string }[] =
   { key: "reached_1b", color: "bg-sky-400", label: "1b" },
   { key: "wounded", color: "bg-yellow-400", label: "Haavoittui" },
   { key: "stayed", color: "bg-gray-400", label: "Pysyi" },
-  { key: "out", color: "bg-red-500", label: "Palanut" },
+  { key: "out", color: "bg-red-500", label: "Paloi" },
 ];
 
 function StackedBar({ row }: { row: DistributionRow }) {

@@ -104,7 +104,7 @@ function TeamPage() {
           </nav>
           <div className="flex items-center gap-3">
             {team.logo_url && <img src={team.logo_url} alt="" className="h-10 w-10 rounded-md object-contain" />}
-            <h1 className="text-2xl font-bold">{team.name}</h1>
+            <h1 className="text-2xl font-bold">{team.name} – Sisäpeli</h1>
           </div>
         </div>
       </header>
