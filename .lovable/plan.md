@@ -1,45 +1,43 @@
-## Tavoite
+## Tausta
 
-Jakaumavisualisaatiossa (Tila A):
-1. Lisätään aggregaattirivit niille sloteille joiden filtteri on "Kuka tahansa" tai "Kuka tahansa tai ei kukaan".
-2. Rivien järjestys on kiinteä rooli-järjestys: **Lyöjä → 1-pesä → 2-pesä → 3-pesä**. Nimetty pelaaja korvaa otsikon kyseisessä paikassa, mutta järjestys ei muutu.
+Tietokannassa `role_at_start` saa parserin (`supabase/functions/_shared/parseMatch.ts` → `determineRole`) perusteella vain arvoja `"lead_runner"` tai `"tail_runner"`. Arvoa `"batter"` ei koskaan tallenneta — lyöjä tunnistetaan `start_base = 0` -arvosta.
 
-## Säännöt
+## Bugi 1: kuollut `=== "batter"` -vertailu
 
-- Yksi rivi per slot (`batter`, `runner1`, `runner2`, `runner3`), kiinteässä järjestyksessä yllä.
-- Rivin sisältö riippuu slotin tilasta:
-  - `player` (nimetty pelaaja) → rivi näyttää pelaajan nimen, data lasketaan vain riveistä joissa kyseinen pelaaja on tuossa roolissa.
-  - `any` tai `any_or_none` → rivi näyttää otsikon "Lyöjä" / "1-pesä" / "2-pesä" / "3-pesä", data lasketaan kaikista riveistä joissa rooli on täytetty (kuka tahansa pelaaja).
-  - `none` → rivi piilotetaan (slotti määritelmän mukaan tyhjä).
-  - `measured` → ei näytetä (Tila B ottaa hoitaakseen, ei pitäisi tulla tähän koodipolkuun).
-- Jos rivin otos = 0, rivi piilotetaan käyttäjän valinnan mukaisesti.
-- `any_or_none`-tapauksessa aggregaatti lasketaan vain riveistä joissa rooli oli täytetty (vastaavasti kuin nykyinen `start_base !== null` -ehto edellytti).
+`src/lib/aggregate.ts` rivi 174, funktiossa `rowSlot`:
 
-## Muutokset
+```ts
+default:
+  return row.role_at_start === "batter" ? "batter" : null;
+```
 
-### `src/lib/aggregate.ts`
+Tämä haara osuu vain kun `start_base` on `null` (ei 0–3). Vertailu `=== "batter"` ei voi koskaan onnistua, joten haara palauttaa aina `null`. Jos lyöjän rivi tulisi joskus ilman `start_base`-arvoa, slotti jäisi tunnistamatta.
 
-- Päivitä `DistributionRow` sisältämään `slot: "batter" | "runner1" | "runner2" | "runner3"` ja `label: string` (joko pelaajan nimi tai "Lyöjä"/"1-pesä"/jne.). `player_id` voidaan jättää, mutta avain on slot.
-- Korvaa nykyinen `aggregateDistribution`-logiikka roolipohjaisella aggregoinnilla:
-  - Käy slotit järjestyksessä `batter, runner1, runner2, runner3`.
-  - Skipataan slot jos `none` tai `measured`.
-  - Iteroi rivit; jokaiselle slotille poimi roolin haltija (batter_id / effective_start_runner_1b / 2b / 3b). Jos haltija puuttuu, ohita rivi tämän slotin osalta.
-  - Jos slot = `player`, hyväksy vain rivit joissa haltija == valittu pelaaja-id.
-  - Päivitä lopputilojen luokitus nykyisellä logiikalla (`got_out` → out, `got_wounded` → wounded, `end_base 4/3/2/1` → scored/3b/2b/1b, `end_base === start_base` → stayed).
-- Palauta taulukko kiinteässä slot-järjestyksessä, suodata pois `total === 0`.
+**Korjaus:** vaihda vertailu vastaamaan oikeaa DB-arvoa. Lyöjä on aina kärki vuoron alussa, joten kun `start_base` on null mutta rooli on `"lead_runner"`, voidaan turvallisesti palauttaa `null` (ei batter-päättelyä) — tai jos halutaan säilyttää alkuperäinen tarkoitus, hyödynnetään `batter_id`-vertailua. Yksinkertaisin korjaus: poista koko `default`-fallback ja palauta vain `null`, koska parserin invariantti takaa että lyöjällä on `start_base = 0`.
 
-### `src/components/distribution-display.tsx`
+```ts
+default:
+  return null;
+```
 
-- Renderöi rivit annetussa järjestyksessä (ei sortausta totalin mukaan enää).
-- Rivin otsikkona käytetään `row.label`.
+## Bugi 2: `a.total += 1` kahdesti
 
-### Ei muutoksia
+`src/lib/aggregate.ts` `aggregateDistribution`-funktiossa rivit ~203–207:
 
-- `filters.ts`, `team.$teamId.tsx` (paitsi mahdollinen tyyppipäivitys jos tarpeen), queryt, `stats-display.tsx`.
+```ts
+if (!agg[slot]) agg[slot] = makeRow(slot, label);
+const a = agg[slot]!;
+a.total += 1;
 
-## Hyväksymiskriteerit
+a.total += 1;   // ← duplikaatti
+```
 
-- Rivien järjestys ylhäältä alas: Lyöjä → 1-pesä → 2-pesä → 3-pesä (paitsi piilotetut).
-- Nimetty pelaaja näkyy oikean roolin paikalla, ei erillisenä lisärivinä.
-- Slotit joissa "Ei kukaan" tai joista ei dataa eivät näy.
-- "Kuka tahansa" / "Kuka tahansa tai ei kukaan" -slot näkyy roolin yleisnimellä.
+Tämä nostaa `total`-laskuria kaksi kertaa per rivi, mikä vääristää jakauman absoluuttiset luvut (prosentit pysyvät oikein vain jos `else a.total -= 1` -haara osuu, joka kompensoi vain yhden lisäyksen). Lisäksi `r.end_base === r.start_base` -haarassa `stayed` lasketaan +1 mutta `total` on jo +2.
+
+**Korjaus:** poista jälkimmäinen `a.total += 1;` -rivi.
+
+## Tiedostot
+
+- `src/lib/aggregate.ts` — kaksi pientä muutosta
+
+Ei muutoksia edge-funktioihin, tyyppeihin (`supabase/functions/_shared/types.ts`:n `PlayerRole`-unionissa oleva `'batter'` on harmiton, koska parser ei sitä koskaan tuota) eikä DB-skeemaan.
