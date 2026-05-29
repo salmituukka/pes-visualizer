@@ -6,9 +6,9 @@ export const baseSlotSchema = z.string();
 export const teamFiltersSchema = z.object({
   seasonSeriesId: z.coerce.number(),
   groupId: z.coerce.number().optional(),
-  runner1: baseSlotSchema.default("any"),
-  runner2: baseSlotSchema.default("any"),
-  runner3: baseSlotSchema.default("any"),
+  runner1: baseSlotSchema.default("any_or_none"),
+  runner2: baseSlotSchema.default("any_or_none"),
+  runner3: baseSlotSchema.default("any_or_none"),
   batter: baseSlotSchema.default("any"),
   hitNumber: z.enum(["1", "2", "3", "any-single", "turn"]).default("turn"),
   goal: z.enum(["lead_advance", "tail_advance", "no_outs"]).default("lead_advance"),
