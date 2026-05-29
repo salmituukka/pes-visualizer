@@ -191,13 +191,13 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
       <Card>
         <CardContent className="p-4 space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tavoite</h3>
-          {!measured && (
+          {measured === null && (
             <p className="text-xs text-muted-foreground">Aseta "Mitattava" jollekin pesälle nähdäksesi tavoitevaihtoehdot.</p>
           )}
           <Select
             value={search.goal}
             onValueChange={(v) => navigate({ search: (p: any) => ({ ...p, goal: v }) })}
-            disabled={!measured}
+            disabled={measured === null}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
