@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { DistributionRow } from "@/lib/aggregate";
+import type { DistributionRow, ExpectedValues } from "@/lib/aggregate";
 
 const SEGMENTS: { key: keyof DistributionRow; color: string; label: string }[] = [
   { key: "scored", color: "bg-emerald-500", label: "Juoksu" },
