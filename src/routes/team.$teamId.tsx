@@ -136,6 +136,11 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const { data: matches } = useQuery({
+    ...teamMatchesQueryOptions(teamId, seasonSeriesId),
+    enabled: seasonSeriesId > 0,
+  });
+
   const setSlot = (slot: SlotKey, value: string) => {
     navigate({
       search: (prev: any) => ({ ...prev, [slot]: value }),
@@ -144,8 +149,25 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
 
   const measured = hasMeasured(search as TeamFilters);
 
+  const matchOptions = useMemo(() => {
+    if (!matches) return [];
+    return matches
+      .filter((m: any) => m.events_fetched_at)
+      .map((m: any) => {
+        const isHome = m.home_team_id === teamId;
+        const opp = isHome ? m.away : m.home;
+        const oppName = opp?.shorthand || opp?.name || "?";
+        const d = m.match_date ? new Date(m.match_date) : null;
+        const dateStr = d
+          ? `${d.getDate()}.${d.getMonth() + 1}.`
+          : "";
+        return { match_id: m.match_id as number, label: `${oppName} ${dateStr}`.trim() };
+      });
+  }, [matches, teamId]);
+
   return (
     <>
+
       <Card>
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pesätilanne</h3>
