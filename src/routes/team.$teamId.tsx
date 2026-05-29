@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { BaseFieldPicker, type SlotKey } from "@/components/base-field-picker";
 import { StatsDisplay } from "@/components/stats-display";
 import { DistributionDisplay } from "@/components/distribution-display";
-import { aggregateAtBatStats, aggregatePitchStats, aggregateDistribution } from "@/lib/aggregate";
+import { aggregateAtBatStats, aggregatePitchStats, aggregateDistribution, aggregateExpectedValues } from "@/lib/aggregate";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
