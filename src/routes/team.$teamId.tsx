@@ -32,7 +32,9 @@ const searchSchema = z.object({
   batter: fallback(z.string(), "any").default("any"),
   hitNumber: fallback(z.enum(["1", "2", "3", "any-single", "turn"]), "turn").default("turn"),
   goal: fallback(z.enum(["lead_advance", "tail_advance", "no_outs"]), "lead_advance").default("lead_advance"),
+  matchId: fallback(z.coerce.number().optional(), undefined),
 });
+
 
 export const Route = createFileRoute("/team/$teamId")({
   validateSearch: zodValidator(searchSchema),
@@ -134,6 +136,11 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
+  const { data: matches } = useQuery({
+    ...teamMatchesQueryOptions(teamId, seasonSeriesId),
+    enabled: seasonSeriesId > 0,
+  });
+
   const setSlot = (slot: SlotKey, value: string) => {
     navigate({
       search: (prev: any) => ({ ...prev, [slot]: value }),
@@ -142,8 +149,25 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
 
   const measured = hasMeasured(search as TeamFilters);
 
+  const matchOptions = useMemo(() => {
+    if (!matches) return [];
+    return matches
+      .filter((m: any) => m.events_fetched_at)
+      .map((m: any) => {
+        const isHome = m.home_team_id === teamId;
+        const opp = isHome ? m.away : m.home;
+        const oppName = opp?.shorthand || opp?.name || "?";
+        const d = m.match_date ? new Date(m.match_date) : null;
+        const dateStr = d
+          ? `${d.getDate()}.${d.getMonth() + 1}.`
+          : "";
+        return { match_id: m.match_id as number, label: `${oppName} ${dateStr}`.trim() };
+      });
+  }, [matches, teamId]);
+
   return (
     <>
+
       <Card>
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pesätilanne</h3>
@@ -190,6 +214,28 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
 
       <Card>
         <CardContent className="p-4 space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Ottelu</h3>
+          <Select
+            value={search.matchId ? String(search.matchId) : "all"}
+            onValueChange={(v) =>
+              navigate({ search: (p: any) => ({ ...p, matchId: v === "all" ? undefined : Number(v) }) })
+            }
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Kaikki ottelut</SelectItem>
+              {matchOptions.map((m) => (
+                <SelectItem key={m.match_id} value={String(m.match_id)}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tavoite</h3>
           {measured === null && (
             <p className="text-xs text-muted-foreground">Aseta "Mitattava" jollekin pesälle nähdäksesi tavoitevaihtoehdot.</p>
@@ -225,26 +271,37 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     enabled: usePitch && seasonSeriesId > 0,
   });
 
+  const filteredAtBatRows = useMemo(
+    () => (search.matchId ? (atBatRows ?? []).filter((r: any) => r.match_id === search.matchId) : atBatRows),
+    [atBatRows, search.matchId],
+  );
+  const filteredPitchRows = useMemo(
+    () => (search.matchId ? (pitchRows ?? []).filter((r: any) => r.match_id === search.matchId) : pitchRows),
+    [pitchRows, search.matchId],
+  );
+
   const measured = hasMeasured(search);
-  const totalEvents = (atBatRows?.length ?? 0) + (pitchRows?.length ?? 0);
+  const totalEvents = (filteredAtBatRows?.length ?? 0) + (filteredPitchRows?.length ?? 0);
+
 
   const rankingRows = useMemo(() => {
     if (measured === null) return [];
-    if (usePitch) return pitchRows ? aggregatePitchStats(pitchRows as any, search) : [];
-    return atBatRows ? aggregateAtBatStats(atBatRows as any, search) : [];
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return filteredPitchRows ? aggregatePitchStats(filteredPitchRows as any, search) : [];
+    return filteredAtBatRows ? aggregateAtBatStats(filteredAtBatRows as any, search) : [];
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
 
   const distributionRows = useMemo(() => {
     if (measured !== null) return [];
-    if (usePitch) return pitchRows ? aggregateDistribution(pitchRows as any, search, "pitch") : [];
-    return atBatRows ? aggregateDistribution(atBatRows as any, search, "at_bat") : [];
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return filteredPitchRows ? aggregateDistribution(filteredPitchRows as any, search, "pitch") : [];
+    return filteredAtBatRows ? aggregateDistribution(filteredAtBatRows as any, search, "at_bat") : [];
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
 
   const expected = useMemo(() => {
     if (measured !== null) return { n: 0, runs: 0, leadAdvance: 0, tailAdvance: 0, wounded: 0, leadOuts: 0, tailOuts: 0 };
-    if (usePitch) return aggregateExpectedValues((pitchRows ?? []) as any, search, "pitch");
-    return aggregateExpectedValues((atBatRows ?? []) as any, search, "at_bat");
-  }, [measured, usePitch, atBatRows, pitchRows, search]);
+    if (usePitch) return aggregateExpectedValues((filteredPitchRows ?? []) as any, search, "pitch");
+    return aggregateExpectedValues((filteredAtBatRows ?? []) as any, search, "at_bat");
+  }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
+
 
   if (a1 || a2) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
 
