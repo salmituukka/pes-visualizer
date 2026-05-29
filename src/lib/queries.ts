@@ -211,13 +211,14 @@ export const teamMatchesQueryOptions = (team_id: number, season_series_id: numbe
       return await fetchAllPaged<any>((from, to) =>
         supabase
           .from("matches")
-          .select("*")
+          .select("*, home:teams!matches_home_team_id_fkey(team_id, name, shorthand), away:teams!matches_away_team_id_fkey(team_id, name, shorthand)")
           .eq("season_series_id", season_series_id)
           .or(`home_team_id.eq.${team_id},away_team_id.eq.${team_id}`)
           .order("match_date", { ascending: false })
           .range(from, to),
       );
     },
+
     staleTime: 30 * 1000,
   });
 
