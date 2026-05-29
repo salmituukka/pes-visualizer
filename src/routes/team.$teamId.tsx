@@ -9,6 +9,8 @@ import {
   teamMatchesQueryOptions,
   atBatParticipantsQueryOptions,
   pitchParticipantsQueryOptions,
+  opponentAtBatParticipantsQueryOptions,
+  opponentPitchParticipantsQueryOptions,
 } from "@/lib/queries";
 import { ensurePlayerSync, parseMissingMatches } from "@/lib/match-sync";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,7 +23,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { hasMeasured, type TeamFilters } from "@/lib/filters";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { hasMeasured, parseSlot, type TeamFilters } from "@/lib/filters";
 
 const searchSchema = z.object({
   seasonSeriesId: fallback(z.coerce.number(), 0).default(0),
@@ -33,6 +36,7 @@ const searchSchema = z.object({
   hitNumber: fallback(z.enum(["1", "2", "3", "any-single", "turn"]), "turn").default("turn"),
   goal: fallback(z.enum(["lead_advance", "tail_advance", "no_outs"]), "lead_advance").default("lead_advance"),
   matchId: z.coerce.number().optional().catch(undefined),
+  mode: fallback(z.enum(["offense", "defense"]), "offense").default("offense"),
 });
 
 
@@ -46,11 +50,34 @@ export const Route = createFileRoute("/team/$teamId")({
   component: TeamPage,
 });
 
+/** Ulkopelissä pelaaja-valinnat ja "Mitattava" käsitellään aina any/any_or_none:na. */
+function sanitizeForDefense(f: TeamFilters): TeamFilters {
+  const fixRunner = (v: string) => {
+    const p = parseSlot(v);
+    if (p.kind === "player" || p.kind === "measured") return "any_or_none";
+    return v;
+  };
+  const fixBatter = (v: string) => {
+    const p = parseSlot(v);
+    if (p.kind === "player" || p.kind === "measured") return "any";
+    return v;
+  };
+  return {
+    ...f,
+    runner1: fixRunner(f.runner1),
+    runner2: fixRunner(f.runner2),
+    runner3: fixRunner(f.runner3),
+    batter: fixBatter(f.batter),
+  };
+}
+
 function TeamPage() {
   const { teamId } = Route.useParams();
   const search = Route.useSearch();
   const teamIdNum = Number(teamId);
   const seasonSeriesId = search.seasonSeriesId;
+  const navigate = useNavigate({ from: Route.fullPath });
+  const isDefense = search.mode === "defense";
 
   const { data: team } = useSuspenseQuery(teamQueryOptions(teamIdNum));
   const { data: matches } = useQuery({
@@ -59,8 +86,15 @@ function TeamPage() {
   });
   const { data: roster } = useQuery({
     ...teamRosterQueryOptions(teamIdNum, seasonSeriesId),
-    enabled: seasonSeriesId > 0,
+    enabled: seasonSeriesId > 0 && !isDefense,
   });
+
+  const opponentMatchIds = useMemo(() => {
+    if (!matches) return [];
+    return matches
+      .filter((m: any) => m.events_fetched_at)
+      .map((m: any) => m.match_id as number);
+  }, [matches]);
 
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -82,6 +116,8 @@ function TeamPage() {
         if (cancelled) return;
         queryClient.invalidateQueries({ queryKey: ["v-at-bat", teamIdNum, seasonSeriesId] });
         queryClient.invalidateQueries({ queryKey: ["v-pitch", teamIdNum, seasonSeriesId] });
+        queryClient.invalidateQueries({ queryKey: ["opp-v-at-bat", teamIdNum, seasonSeriesId] });
+        queryClient.invalidateQueries({ queryKey: ["opp-v-pitch", teamIdNum, seasonSeriesId] });
         queryClient.invalidateQueries({ queryKey: ["team-roster", teamIdNum, seasonSeriesId] });
         queryClient.invalidateQueries({ queryKey: ["team-matches", teamIdNum, seasonSeriesId] });
       } finally {
@@ -95,6 +131,23 @@ function TeamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matches?.length, seasonSeriesId, teamIdNum]);
 
+  const setMode = (m: "offense" | "defense") => {
+    if (!m || m === search.mode) return;
+    navigate({
+      search: (prev: any) => {
+        const next = { ...prev, mode: m };
+        if (m === "defense") {
+          const sanitized = sanitizeForDefense(prev as TeamFilters);
+          next.runner1 = sanitized.runner1;
+          next.runner2 = sanitized.runner2;
+          next.runner3 = sanitized.runner3;
+          next.batter = sanitized.batter;
+        }
+        return next;
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur">
@@ -104,17 +157,35 @@ function TeamPage() {
             <span className="mx-2">/</span>
             <span className="text-foreground">{team.name}</span>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {team.logo_url && <img src={team.logo_url} alt="" className="h-10 w-10 rounded-md object-contain" />}
-            <h1 className="text-2xl font-bold">{team.name} – Sisäpeli</h1>
+            <h1 className="text-2xl font-bold">
+              {team.name} – {isDefense ? "Ulkopeli" : "Sisäpeli"}
+            </h1>
+            <ToggleGroup
+              type="single"
+              value={search.mode}
+              onValueChange={(v) => setMode(v as "offense" | "defense")}
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+            >
+              <ToggleGroupItem value="offense" aria-label="Sisäpeli">Sisäpeli</ToggleGroupItem>
+              <ToggleGroupItem value="defense" aria-label="Ulkopeli">Ulkopeli</ToggleGroupItem>
+            </ToggleGroup>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 grid gap-6 lg:grid-cols-[320px_1fr]">
         <aside className="space-y-4">
-          <FilterPanel roster={roster ?? []} teamId={teamIdNum} seasonSeriesId={seasonSeriesId} />
-
+          <FilterPanel
+            roster={roster ?? []}
+            teamId={teamIdNum}
+            seasonSeriesId={seasonSeriesId}
+            isDefense={isDefense}
+            opponentMatchIds={opponentMatchIds}
+          />
         </aside>
         <section className="space-y-4">
           {syncing && progress && (
@@ -125,14 +196,31 @@ function TeamPage() {
               </CardContent>
             </Card>
           )}
-          <StatsSection teamId={teamIdNum} seasonSeriesId={seasonSeriesId} />
+          <StatsSection
+            teamId={teamIdNum}
+            seasonSeriesId={seasonSeriesId}
+            isDefense={isDefense}
+            opponentMatchIds={opponentMatchIds}
+          />
         </section>
       </main>
     </div>
   );
 }
 
-function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: number; full_name: string | null }[]; teamId: number; seasonSeriesId: number }) {
+function FilterPanel({
+  roster,
+  teamId,
+  seasonSeriesId,
+  isDefense,
+  opponentMatchIds,
+}: {
+  roster: { player_id: number; full_name: string | null }[];
+  teamId: number;
+  seasonSeriesId: number;
+  isDefense: boolean;
+  opponentMatchIds: number[];
+}) {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
@@ -165,9 +253,9 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
       });
   }, [matches, teamId]);
 
+  // Ulkopelissä mitattavaa ei voi olla → näytetään vain peruskortit ilman Tavoite-korttia
   return (
     <>
-
       <Card>
         <CardContent className="p-4 space-y-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pesätilanne</h3>
@@ -184,11 +272,11 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
             seasonSeriesId={seasonSeriesId}
             hitNumber={search.hitNumber}
             matchId={search.matchId}
+            disablePlayers={isDefense}
+            opponentMatchIds={opponentMatchIds}
           />
         </CardContent>
       </Card>
-
-
 
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -233,44 +321,71 @@ function FilterPanel({ roster, teamId, seasonSeriesId }: { roster: { player_id: 
         </CardContent>
       </Card>
 
-
-
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tavoite</h3>
-          {measured === null && (
-            <p className="text-xs text-muted-foreground">Aseta "Mitattava" jollekin pesälle nähdäksesi tavoitevaihtoehdot.</p>
-          )}
-          <Select
-            value={search.goal}
-            onValueChange={(v) => navigate({ search: (p: any) => ({ ...p, goal: v }) })}
-            disabled={measured === null}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lead_advance">Kärkisiirtymä</SelectItem>
-              <SelectItem value="tail_advance">Takasiirtymä</SelectItem>
-              <SelectItem value="no_outs">Ei paloja</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
+      {!isDefense && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Tavoite</h3>
+            {measured === null && (
+              <p className="text-xs text-muted-foreground">Aseta "Mitattava" jollekin pesälle nähdäksesi tavoitevaihtoehdot.</p>
+            )}
+            <Select
+              value={search.goal}
+              onValueChange={(v) => navigate({ search: (p: any) => ({ ...p, goal: v }) })}
+              disabled={measured === null}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lead_advance">Kärkisiirtymä</SelectItem>
+                <SelectItem value="tail_advance">Takasiirtymä</SelectItem>
+                <SelectItem value="no_outs">Ei paloja</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }
 
-function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeriesId: number }) {
-  const search = Route.useSearch() as TeamFilters;
+function StatsSection({
+  teamId,
+  seasonSeriesId,
+  isDefense,
+  opponentMatchIds,
+}: {
+  teamId: number;
+  seasonSeriesId: number;
+  isDefense: boolean;
+  opponentMatchIds: number[];
+}) {
+  const rawSearch = Route.useSearch() as TeamFilters;
+  // Ulkopelissä pakotetaan pelaaja/measured pois suodattimista myös aggregoinnissa
+  const search = isDefense ? sanitizeForDefense(rawSearch) : rawSearch;
   const usePitch = search.hitNumber !== "turn";
 
-  const { data: atBatRows, isLoading: a1 } = useQuery({
+  const offenseAtBat = useQuery({
     ...atBatParticipantsQueryOptions(teamId, seasonSeriesId),
-    enabled: !usePitch && seasonSeriesId > 0,
+    enabled: !isDefense && !usePitch && seasonSeriesId > 0,
   });
-  const { data: pitchRows, isLoading: a2 } = useQuery({
+  const offensePitch = useQuery({
     ...pitchParticipantsQueryOptions(teamId, seasonSeriesId),
-    enabled: usePitch && seasonSeriesId > 0,
+    enabled: !isDefense && usePitch && seasonSeriesId > 0,
   });
+  const defenseAtBat = useQuery({
+    ...opponentAtBatParticipantsQueryOptions(teamId, seasonSeriesId, opponentMatchIds),
+    enabled: isDefense && !usePitch && seasonSeriesId > 0 && opponentMatchIds.length > 0,
+  });
+  const defensePitch = useQuery({
+    ...opponentPitchParticipantsQueryOptions(teamId, seasonSeriesId, opponentMatchIds),
+    enabled: isDefense && usePitch && seasonSeriesId > 0 && opponentMatchIds.length > 0,
+  });
+
+  const atBatRows = isDefense ? defenseAtBat.data : offenseAtBat.data;
+  const pitchRows = isDefense ? defensePitch.data : offensePitch.data;
+  const loading =
+    (usePitch
+      ? (isDefense ? defensePitch.isLoading : offensePitch.isLoading)
+      : (isDefense ? defenseAtBat.isLoading : offenseAtBat.isLoading));
 
   const filteredAtBatRows = useMemo(
     () => (search.matchId ? (atBatRows ?? []).filter((r: any) => r.match_id === search.matchId) : atBatRows),
@@ -281,9 +396,9 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     [pitchRows, search.matchId],
   );
 
-  const measured = hasMeasured(search);
+  // Ulkopelissä measured aina null
+  const measured = isDefense ? null : hasMeasured(search);
   const totalEvents = (filteredAtBatRows?.length ?? 0) + (filteredPitchRows?.length ?? 0);
-
 
   const rankingRows = useMemo(() => {
     if (measured === null) return [];
@@ -303,8 +418,7 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     return aggregateExpectedValues((filteredAtBatRows ?? []) as any, search, "at_bat");
   }, [measured, usePitch, filteredAtBatRows, filteredPitchRows, search]);
 
-
-  if (a1 || a2) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
 
   if (measured !== null) {
     return <StatsDisplay rows={rankingRows} filters={search} totalEvents={totalEvents} />;
