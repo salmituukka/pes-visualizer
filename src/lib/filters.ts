@@ -12,7 +12,9 @@ export const teamFiltersSchema = z.object({
   batter: baseSlotSchema.default("any"),
   hitNumber: z.enum(["1", "2", "3", "any-single", "turn"]).default("turn"),
   goal: z.enum(["lead_advance", "tail_advance", "no_outs"]).default("lead_advance"),
+  matchId: z.coerce.number().optional(),
 });
+
 
 export type TeamFilters = z.infer<typeof teamFiltersSchema>;
 
