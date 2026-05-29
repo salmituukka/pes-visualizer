@@ -75,9 +75,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Pesistilastot" },
       { name: "description", content: "Pesäpalloilijoiden onnistumistilastot eri pelitilanteissa." },
       { property: "og:title", content: "Pesistilastot" },
-      { property: "og:description", content: "Pelaajien onnistumiset eri pelitilanteissa." },
+      { property: "og:description", content: "Pesäpalloilijoiden onnistumistilastot eri pelitilanteissa." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Pesistilastot" },
+      { name: "twitter:description", content: "Pesäpalloilijoiden onnistumistilastot eri pelitilanteissa." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ab34d4e7-0175-48af-a5e7-f48084e0d539/id-preview-c0678ef8--d1397011-46c6-44ad-9768-8a2ba30d777c.lovable.app-1780055690367.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ab34d4e7-0175-48af-a5e7-f48084e0d539/id-preview-c0678ef8--d1397011-46c6-44ad-9768-8a2ba30d777c.lovable.app-1780055690367.png" },
     ],
     links: [
       {
