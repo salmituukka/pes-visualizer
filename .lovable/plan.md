@@ -1,19 +1,26 @@
-## Bugi
+## Toinen sama bugi
 
-`src/lib/aggregate.ts`-tiedoston `matchesSlot`-funktiossa (rivit 32–44) `"any"` ja `"any_or_none"` käsitellään identtisesti — molemmat palauttavat `true` riippumatta siitä, onko pesällä pelaajaa vai ei. Tämän takia "Kuka tahansa" päästää läpi myös tilanteet, joissa pesä on tyhjä, vaikka sen kuuluisi vaatia jokin pelaaja pesällä.
+`src/components/base-field-picker.tsx` -tiedoston `matchesRunnerSlot`-funktiossa (rivit 61–73) on identtinen bugi: `"any"` ja `"any_or_none"` käsitellään samoin (molemmat `return true`). Tämä vaikuttaa pesäpallokenttä-visualisaation **lyöntipisteisiin** (väriympyrät kentällä) — ne näytetään myös pesätilanteissa, joissa "Kuka tahansa" -pesä on tyhjä.
 
 ## Korjaus
 
-Muutetaan `matchesSlot` niin että:
-- `"any"` → `actual !== null` (pesällä oltava joku pelaaja)
-- `"any_or_none"` → `true` (sallii sekä pelaajan että tyhjän)
-- `"measured"` → `true` (kuten ennen; rajaus tehdään `start_base`-tarkistuksella)
-- `"none"`, `"player"` → ennallaan
+Sama kuvio kuin `aggregate.ts`:ssa:
 
-Lyöjä-paikalla (`batter`) `batter_id` on käytännössä aina olemassa, joten korjaus ei vaikuta lyöjäsuodatukseen. Vaikutus kohdistuu etenijä-paikkoihin (1b/2b/3b), mikä on haluttu lopputulos.
+```ts
+case "any":
+  return value !== null;
+case "any_or_none":
+case "measured":
+  return true;
+```
+
+## Tarkistettu, ei muita esiintymiä
+
+Tämä on ainoa muu paikka koodikannassa, jossa slot-arvoja matchataan dataan. Muut `parseSlot`-käyttäjät:
+- `src/lib/filters.ts` `hasMeasured` — tarkistaa vain `kind === "measured"`, ei matchausta.
+- `src/lib/aggregate.ts` `aggregateDistribution` (rivi 226) — käyttää `s.kind`:iä päättääkseen mitkä slotit *näytetään* jakaumassa (none/measured pois), ei rivien suodatukseen.
+- `base-field-picker.tsx` `SlotMarker` (rivi 272) — vain visuaalinen renderöinti.
 
 ## Muutettavat tiedostot
 
-- `src/lib/aggregate.ts` — `matchesSlot` (rivit 32–44): erota `"any"` haarasta omakseen palauttamaan `actual !== null`.
-
-Ei muita muutoksia; sama `matchesSlot` palvelee sekä `aggregateAtBatStats`, `aggregatePitchStats` että `aggregateDistribution` -funktioita.
+- `src/components/base-field-picker.tsx` rivit 61–73: erota `"any"` omaksi haaraksi palauttamaan `value !== null`.
