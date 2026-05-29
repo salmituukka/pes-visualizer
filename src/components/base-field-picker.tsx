@@ -86,7 +86,7 @@ function matchesBatterSlot(filter: string, value: number | null): boolean {
   return true;
 }
 
-export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber, matchId }: Props) {
+export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeriesId, hitNumber, matchId, disablePlayers, opponentMatchIds }: Props) {
 
   const [openSlot, setOpenSlot] = useState<SlotKey | null>(null);
   const isMobile = useIsMobile();
@@ -108,10 +108,16 @@ export function BaseFieldPicker({ roster, values, onChange, teamId, seasonSeries
   const playersById = new Map(roster.map((p) => [p.player_id, p]));
 
   const enabled = !!teamId && !!seasonSeriesId && teamId > 0 && seasonSeriesId > 0;
-  const { data: pitchPoints } = useQuery({
+  const offensePoints = useQuery({
     ...pitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0),
-    enabled,
+    enabled: enabled && !disablePlayers,
   });
+  const defensePoints = useQuery({
+    ...opponentPitchPointsQueryOptions(teamId ?? 0, seasonSeriesId ?? 0, opponentMatchIds ?? []),
+    enabled: enabled && !!disablePlayers && (opponentMatchIds?.length ?? 0) > 0,
+  });
+  const pitchPoints = disablePlayers ? defensePoints.data : offensePoints.data;
+
 
   const filteredPoints = useMemo(() => {
     if (!pitchPoints) return [];
