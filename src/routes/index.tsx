@@ -38,14 +38,31 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { data: seriesList } = useSuspenseQuery(seriesListQueryOptions);
+  const [year, setYear] = useState<number | null>(null);
   const [seriesName, setSeriesName] = useState<string>("");
-  const [seasonSeriesId, setSeasonSeriesId] = useState<number | null>(null);
   const [groupId, setGroupId] = useState<number | null>(null);
 
-  const selectedSeries = useMemo(
-    () => seriesList.find((s) => s.series_name === seriesName) ?? null,
-    [seriesList, seriesName],
+  // Kaikki uniikit vuodet kaikista sarjoista, uusin ensin
+  const allYears = useMemo(() => {
+    const ys = new Set<number>();
+    seriesList.forEach((s) => s.years.forEach((y) => ys.add(y.year)));
+    return Array.from(ys).sort((a, b) => b - a);
+  }, [seriesList]);
+
+  // Sarjat jotka ovat valittuna vuonna käytettävissä
+  const seriesForYear = useMemo(
+    () =>
+      year === null
+        ? []
+        : seriesList.filter((s) => s.years.some((y) => y.year === year)),
+    [seriesList, year],
   );
+
+  const seasonSeriesId = useMemo(() => {
+    if (year === null || !seriesName) return null;
+    const s = seriesList.find((s) => s.series_name === seriesName);
+    return s?.years.find((y) => y.year === year)?.season_series_id ?? null;
+  }, [seriesList, seriesName, year]);
 
   // Varmista että sarja on synkronoitu kun kausi on valittu
   const syncQuery = useQuery({
@@ -66,32 +83,35 @@ function Index() {
         <Card>
           <CardContent className="grid gap-4 p-6 md:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Sarja</label>
-              <SeriesPicker
-                seriesList={seriesList}
-                value={seriesName}
-                onChange={(v) => {
-                  setSeriesName(v);
-                  setSeasonSeriesId(null);
-                  setGroupId(null);
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
               <label className="text-sm font-medium">Kausi</label>
               <Select
-                value={seasonSeriesId ? String(seasonSeriesId) : ""}
-                onValueChange={(v) => { setSeasonSeriesId(Number(v)); setGroupId(null); }}
-                disabled={!selectedSeries}
+                value={year ? String(year) : ""}
+                onValueChange={(v) => {
+                  setYear(Number(v));
+                  setSeriesName("");
+                  setGroupId(null);
+                }}
               >
                 <SelectTrigger><SelectValue placeholder="Valitse kausi" /></SelectTrigger>
                 <SelectContent>
-                  {selectedSeries?.years.map((y) => (
-                    <SelectItem key={y.season_series_id} value={String(y.season_series_id)}>{y.year}</SelectItem>
+                  {allYears.map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sarja</label>
+              <SeriesPicker
+                seriesList={seriesForYear}
+                value={seriesName}
+                disabled={year === null}
+                onChange={(v) => {
+                  setSeriesName(v);
+                  setGroupId(null);
+                }}
+              />
             </div>
 
             <GroupSlot
@@ -102,6 +122,7 @@ function Index() {
             />
           </CardContent>
         </Card>
+
 
         {seasonSeriesId && syncQuery.isFetching && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -128,19 +149,22 @@ function SeriesPicker({
   seriesList,
   value,
   onChange,
+  disabled,
 }: {
   seriesList: { series_name: string }[];
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = seriesList.find((s) => s.series_name === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(o) => !disabled && setOpen(o)}>
       <PopoverTrigger asChild>
         <button
           type="button"
+          disabled={disabled}
           className={cn(
             "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background transition-colors hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
             !value && "text-muted-foreground",
@@ -150,6 +174,7 @@ function SeriesPicker({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </button>
       </PopoverTrigger>
+
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder="Hae sarjaa…" />
