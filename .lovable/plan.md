@@ -1,10 +1,19 @@
 ## Bugi
 
-`src/routes/team.$teamId.tsx` riveillä 194 ja 200 tarkistetaan `!measured`, mutta `hasMeasured` (filters.ts) palauttaa `0 | 1 | 2 | 3 | null`. Kun lyöjä on mitattava, paluuarvo on `0`, ja `!0 === true` → Select disabloituu ja "aseta mitattava" -viesti näkyy vaikka mitattava on asetettu.
+`src/lib/aggregate.ts`-tiedoston `matchesSlot`-funktiossa (rivit 32–44) `"any"` ja `"any_or_none"` käsitellään identtisesti — molemmat palauttavat `true` riippumatta siitä, onko pesällä pelaajaa vai ei. Tämän takia "Kuka tahansa" päästää läpi myös tilanteet, joissa pesä on tyhjä, vaikka sen kuuluisi vaatia jokin pelaaja pesällä.
 
 ## Korjaus
 
-Vaihda molemmat `!measured` → `measured === null`:
+Muutetaan `matchesSlot` niin että:
+- `"any"` → `actual !== null` (pesällä oltava joku pelaaja)
+- `"any_or_none"` → `true` (sallii sekä pelaajan että tyhjän)
+- `"measured"` → `true` (kuten ennen; rajaus tehdään `start_base`-tarkistuksella)
+- `"none"`, `"player"` → ennallaan
 
-- rivi 194: `{measured === null && (`
-- rivi 200: `disabled={measured === null}`
+Lyöjä-paikalla (`batter`) `batter_id` on käytännössä aina olemassa, joten korjaus ei vaikuta lyöjäsuodatukseen. Vaikutus kohdistuu etenijä-paikkoihin (1b/2b/3b), mikä on haluttu lopputulos.
+
+## Muutettavat tiedostot
+
+- `src/lib/aggregate.ts` — `matchesSlot` (rivit 32–44): erota `"any"` haarasta omakseen palauttamaan `actual !== null`.
+
+Ei muita muutoksia; sama `matchesSlot` palvelee sekä `aggregateAtBatStats`, `aggregatePitchStats` että `aggregateDistribution` -funktioita.
