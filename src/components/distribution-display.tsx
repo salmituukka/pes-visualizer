@@ -48,9 +48,13 @@ function Legend() {
 export function DistributionDisplay({
   rows,
   totalEvents,
+  expected,
+  level,
 }: {
   rows: DistributionRow[];
   totalEvents: number;
+  expected: ExpectedValues;
+  level: "at_bat" | "pitch";
 }) {
   if (rows.length === 0) {
     return (
@@ -66,6 +70,18 @@ export function DistributionDisplay({
       </Card>
     );
   }
+
+  const unitLabel = level === "pitch" ? "per lyönti" : "per lyöntivuoro";
+  const fmt = (v: number) => (expected.n === 0 ? "—" : (v / expected.n).toFixed(2));
+
+  const cols: { label: string; value: number }[] = [
+    { label: "Juoksut", value: expected.runs },
+    { label: "Kärkietenemiset", value: expected.leadAdvance },
+    { label: "Takaetenemiset", value: expected.tailAdvance },
+    { label: "Haavoittumiset", value: expected.wounded },
+    { label: "Kärkipalot", value: expected.leadOuts },
+    { label: "Takapalot", value: expected.tailOuts },
+  ];
 
   return (
     <div className="space-y-4">
@@ -91,38 +107,31 @@ export function DistributionDisplay({
 
       <Card>
         <CardHeader>
-          <CardTitle>Lukumäärät</CardTitle>
+          <CardTitle>Odotusarvot</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {unitLabel} · n = {expected.n}
+          </p>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="pb-2">Pelaaja</th>
-                  <th className="pb-2 text-right">Otos</th>
-                  <th className="pb-2 text-right">Juoksu</th>
-                  <th className="pb-2 text-right">3b</th>
-                  <th className="pb-2 text-right">2b</th>
-                  <th className="pb-2 text-right">1b</th>
-                  <th className="pb-2 text-right">Haav.</th>
-                  <th className="pb-2 text-right">Pysyi</th>
-                  <th className="pb-2 text-right">Palo</th>
+                  {cols.map((c) => (
+                    <th key={c.label} className="pb-2 text-right first:text-left">
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.slot} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{r.label}</td>
-                    <td className="py-2 text-right tabular-nums">{r.total}</td>
-                    <td className="py-2 text-right tabular-nums">{r.scored}</td>
-                    <td className="py-2 text-right tabular-nums">{r.reached_3b}</td>
-                    <td className="py-2 text-right tabular-nums">{r.reached_2b}</td>
-                    <td className="py-2 text-right tabular-nums">{r.reached_1b}</td>
-                    <td className="py-2 text-right tabular-nums">{r.wounded}</td>
-                    <td className="py-2 text-right tabular-nums">{r.stayed}</td>
-                    <td className="py-2 text-right tabular-nums">{r.out}</td>
-                  </tr>
-                ))}
+                <tr>
+                  {cols.map((c) => (
+                    <td key={c.label} className="py-2 text-right tabular-nums first:text-left">
+                      {fmt(c.value)}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
