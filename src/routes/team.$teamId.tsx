@@ -32,7 +32,9 @@ const searchSchema = z.object({
   batter: fallback(z.string(), "any").default("any"),
   hitNumber: fallback(z.enum(["1", "2", "3", "any-single", "turn"]), "turn").default("turn"),
   goal: fallback(z.enum(["lead_advance", "tail_advance", "no_outs"]), "lead_advance").default("lead_advance"),
+  matchId: fallback(z.coerce.number().optional(), undefined),
 });
+
 
 export const Route = createFileRoute("/team/$teamId")({
   validateSearch: zodValidator(searchSchema),
