@@ -1,6 +1,25 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// Supabase PostgREST rajoittaa oletuksena palautuksen 1000 riviin riippumatta
+// .limit()-arvosta. Tämä helpperi sivuttaa kyselyn .range()-kutsuilla.
+async function fetchAllPaged<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
 // ============================================================================
 // Series / seasons / groups
 // ============================================================================
