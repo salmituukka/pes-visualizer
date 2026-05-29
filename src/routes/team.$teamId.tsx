@@ -240,10 +240,23 @@ function StatsSection({ teamId, seasonSeriesId }: { teamId: number; seasonSeries
     return atBatRows ? aggregateDistribution(atBatRows as any, search, "at_bat") : [];
   }, [measured, usePitch, atBatRows, pitchRows, search]);
 
+  const expected = useMemo(() => {
+    if (measured !== null) return { n: 0, runs: 0, leadAdvance: 0, tailAdvance: 0, wounded: 0, leadOuts: 0, tailOuts: 0 };
+    if (usePitch) return aggregateExpectedValues((pitchRows ?? []) as any, search, "pitch");
+    return aggregateExpectedValues((atBatRows ?? []) as any, search, "at_bat");
+  }, [measured, usePitch, atBatRows, pitchRows, search]);
+
   if (a1 || a2) return <p className="text-sm text-muted-foreground">Lasketaan tilastoja…</p>;
 
   if (measured !== null) {
     return <StatsDisplay rows={rankingRows} filters={search} totalEvents={totalEvents} />;
   }
-  return <DistributionDisplay rows={distributionRows} totalEvents={totalEvents} />;
+  return (
+    <DistributionDisplay
+      rows={distributionRows}
+      totalEvents={totalEvents}
+      expected={expected}
+      level={usePitch ? "pitch" : "at_bat"}
+    />
+  );
 }
