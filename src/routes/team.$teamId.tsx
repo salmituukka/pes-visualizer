@@ -326,7 +326,7 @@ function FilterPanel({
               <RefreshMatchButton
                 matchId={search.matchId}
                 matchDate={selected.match_date ?? null}
-                teamId={teamIdNum}
+                teamId={teamId}
                 seasonSeriesId={seasonSeriesId}
               />
             );
