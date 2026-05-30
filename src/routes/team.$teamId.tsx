@@ -105,7 +105,9 @@ function TeamPage() {
   useEffect(() => {
     if (!matches || seasonSeriesId <= 0 || syncing) return;
     const pending = matches.filter((m: any) => !m.events_fetched_at || needsReparsing(m));
-    if (pending.length === 0 && team?.last_player_sync) return;
+    const syncFresh = team?.last_player_sync
+      && Date.now() - new Date(team.last_player_sync).getTime() < 60 * 60 * 1000;
+    if (pending.length === 0 && syncFresh) return;
 
     let cancelled = false;
     (async () => {
