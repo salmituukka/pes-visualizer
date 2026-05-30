@@ -154,15 +154,24 @@ export async function fetchAndParseMatch(
   supabase: SupabaseLike & any,
   match_id: number,
   match_date_iso: string | null,
-  apiKey: string
+  apiKey: string,
+  opts: { force?: boolean } = {}
 ): Promise<FetchAndParseResult> {
-  // 1. Tarkista onko parsinta tarpeen
-  const check = await shouldFetchMatch(supabase, match_id, match_date_iso);
-  if (!check.should_fetch) {
-    if (check.reason === 'already_parsed' || check.reason === 'concurrent_fetch') {
-      return { status: 'skipped', reason: check.reason };
+  // 1. Tarkista onko parsinta tarpeen (paitsi jos force=true)
+  if (!opts.force) {
+    const check = await shouldFetchMatch(supabase, match_id, match_date_iso);
+    if (!check.should_fetch) {
+      if (check.reason === 'already_parsed' || check.reason === 'concurrent_fetch') {
+        return { status: 'skipped', reason: check.reason };
+      }
+      return { status: 'skipped', reason: 'already_parsed' };
     }
-    return { status: 'skipped', reason: 'already_parsed' };
+  } else {
+    // Force: päivitä events_fetched_at että muut clientit eivät yritä samaan aikaan
+    await supabase
+      .from('matches')
+      .update({ events_fetched_at: new Date().toISOString() })
+      .eq('match_id', match_id);
   }
   
   // 2. Hae API:sta
@@ -211,10 +220,11 @@ export async function fetchAndParseMatch(
  */
 export async function fetchAndParseMatchBatch(
   supabase: SupabaseLike & any,
-  matches: { match_id: number; match_date_iso: string | null }[],
+  matches: { match_id: number; match_date_iso: string | null; force?: boolean }[],
   apiKey: string,
   options: {
     concurrency?: number;
+    force?: boolean;
     onProgress?: (done: number, total: number, lastResult: FetchAndParseResult) => void;
   } = {}
 ): Promise<FetchAndParseResult[]> {
@@ -222,11 +232,12 @@ export async function fetchAndParseMatchBatch(
   const results: FetchAndParseResult[] = new Array(matches.length);
   let done = 0;
   
-  // Yksinkertainen rinnakkaiskäsittely: jaetaan eriin
   for (let i = 0; i < matches.length; i += concurrency) {
     const batch = matches.slice(i, i + concurrency);
     const batchPromises = batch.map((m, idx) =>
-      fetchAndParseMatch(supabase, m.match_id, m.match_date_iso, apiKey).then(r => {
+      fetchAndParseMatch(supabase, m.match_id, m.match_date_iso, apiKey, {
+        force: m.force ?? options.force ?? false,
+      }).then(r => {
         results[i + idx] = r;
         done++;
         if (options.onProgress) options.onProgress(done, matches.length, r);

@@ -1,74 +1,96 @@
-## Ulkopelinäkymä joukkueen sivulle
+## Tavoite
 
-Lisätään joukkuesivulle Sisäpeli ↔ Ulkopeli -toggle. Ulkopelitilassa katsotaan
-lyöntivuoroja, joissa **vastustaja** on lyömässä joukkueen otteluissa. Mitattava-
-moodi ei ole käytössä, joten näytetään aina lopputilajakauma, odotusarvotaulukko
-ja lyöntikartta.
+Lisätään keskeneräisten / liian aikaisin parsittujen otteluiden automaattinen tunnistus ja uudelleenparsinta, sekä manuaalinen "Päivitä"-nappi yksittäisen ottelun näkymään.
 
-### Käyttöliittymä
+Spec on hyvin määritelty ja toteutettavissa. Alla muutamia tarkennuksia ja yksi pieni huomio.
 
-- Headerin otsikko: "Joukkueen nimi – Sisäpeli" / "– Ulkopeli". Otsikon viereen
-  kompakti toggle (kaksi nappia: Sisäpeli | Ulkopeli).
-- Toggle tallennetaan URL-paramiin `mode=offense|defense` (oletus `offense` =
-  nykyinen sisäpelinäkymä). Muut suodattimet säilyvät vaihdossa, paitsi ne
-  jotka eivät ole ulkopelissä mahdollisia (mitattava-arvot nollataan).
+## Arvio specistä
 
-### Suodattimet ulkopelitilassa
+Spec on järkevä. Yksi tekninen huomio: nykyinen `shouldFetchMatch` (supabase/functions/_shared/fetchAndParse.ts) ohittaa otteluen jos `events_available === true` ja sillä on 1 min "concurrent fetch" -lukko. Uudelleenparsinta vaatii `force`-lipun joka ohittaa molemmat — tämä on pieni lisäys edge functioniin, ei iso muutos.
 
-- **Pesätilanne**: vain "Kuka tahansa" / "Ei kukaan" / "Kuka tahansa tai ei
-  kukaan". Pelaajavalinta ja "Mitattava" piilotetaan kaikilta pesiltä ja
-  lyöjältä. Jos URL:ssä on pelaaja-id tai `measured`, ne käsitellään kuten
-  "Kuka tahansa".
-- **Lyöntinumero**: sama kuin nyt (Lyöntivuoro / 1. / 2. / 3. / Mikä tahansa
-  yksittäinen).
-- **Ottelu**: sama suodatin.
-- **Tavoite-kortti**: piilotetaan kokonaan (ei käytössä ilman mitattavaa).
+Yksi pieni epäjohdonmukaisuus spec:ssä: 30 min throttle on jo periaatteessa hoidettu kannassa (`events_fetched_at`), joten Logic 1 voi luottaa siihen suoraan eikä erillistä client-side throttlea tarvita. Logic 2:n 30 s nappi-throttle hoidetaan komponentin tilassa.
 
-### Visualisaatio
+## Muutokset
 
-Aina "Mitattavaa ei valittu" -tila → näytetään:
-1. **Lyöntikartta** (vastustajan lyönnit, joukkueen otteluista). Sama
-   `pitchPointsQueryOptions`-rakenne, mutta haetaan ottelusta kaikki rivit,
-   joiden `team_id ≠ teamId` ja `match` kuuluu joukkueen otteluihin.
-2. **Lopputilajakauma** (`DistributionDisplay`).
-3. **Odotusarvotaulukko** (`aggregateExpectedValues` → sama komponentti).
+### 1. Edge function: `force`-lippu
 
-Mitattava-tilan ranking-näkymää (`StatsDisplay`) ei renderöidä.
+**`supabase/functions/_shared/fetchAndParse.ts`**
+- `fetchAndParseMatch(supabase, match_id, match_date_iso, apiKey, opts?: { force?: boolean })`
+- Jos `force=true`, ohitetaan `shouldFetchMatch` kokonaan ja edetään suoraan API-hakuun + tallennukseen (saveMatch on jo upsert-pohjainen, joten uudelleenkirjoitus toimii).
 
-### Tekninen toteutus
+**`supabase/functions/fetch-and-parse-match/index.ts`**
+- Hyväksy `force: boolean` request bodyssa (sekä yksittäis- että batch-muoto).
+- Propagoi `fetchAndParseMatchBatch`-läpi.
 
-- **Reitti**: pysyy `/team/$teamId`. Lisätään `mode` searchSchemaan:
-  `mode: fallback(z.enum(["offense","defense"]), "offense").default("offense")`.
-- **Toggle**: pieni `Tabs`- tai kaksi-`Button`-komponentti headerissa, päivittää
-  `mode`-paramin ja tarvittaessa nollaa pelaaja-ID:t / "measured"-arvot
-  ulkopelitilaan vaihdettaessa.
-- **Datakyselyt** (`src/lib/queries.ts`): lisätään uudet variantit, jotka
-  hakevat saman season_series_id:n datan, mutta:
-  - haetaan ensin joukkueen `match_id`-lista (`teamMatchesQueryOptions` jo
-    olemassa) ja filtteröidään näkymäkyselyt `.in("match_id", matchIds)` +
-    `.neq("team_id", teamId)`.
-  - Uudet `queryOptions`: `opponentAtBatParticipantsQueryOptions`,
-    `opponentPitchParticipantsQueryOptions`, `opponentPitchPointsQueryOptions`.
-  - Query keyt esim. `["opp-v-at-bat", teamId, seasonSeriesId]` jotta
-    cache ei sotkeudu sisäpelin kanssa.
-- **`StatsSection`-komponentti**: lisätään `mode`-prop. Kun `defense`:
-  - Käytetään opponent-kyselyitä.
-  - Pakotetaan `measured = null` riippumatta URL-tilasta → aina
-    `DistributionDisplay`.
-  - `BaseFieldPicker`iin uusi `disablePlayers`-prop, joka piilottaa
-    pelaajavalinnan ja Mitattava-vaihtoehdon dropdowneista; jos slotissa on
-    pelaaja-id tai `measured`, käsitellään `any_or_none` / `any`:na.
-- **Roster/sync**: pelaajien synkronointi tarvitaan vain sisäpelissä; ulkopeli
-  ei tarvitse omaa rosteria. Ottelutapahtumat parsitaan joka tapauksessa
-  joukkueen otteluista, joten ulkopelitila näkee saman datan automaattisesti
-  kun sisäpelitila on käynyt sivulla.
-- **Aggregointi** (`src/lib/aggregate.ts`): käyttää samoja funktioita; ne eivät
-  oleta team_id:ta — riittää, että rivit on filtteröity oikein
-  query-tasolla. Tämä varmistetaan testaamalla, ettei `aggregate*`-funktiot
-  viittaa `teamId`-arvoon (nopea katsaus).
+### 2. Logiikka 1: automaattinen uudelleenparsinta
 
-### Mitä EI muuteta
+**`src/lib/match-sync.ts`**
+- Uusi `needsReparsing(match)`:
+  ```
+  const now = Date.now();
+  const matchTime = match.match_date ? new Date(match.match_date).getTime() : null;
+  if (!matchTime || matchTime > now) return false;              // tulevaisuus
+  if (now - matchTime > 30*24*3600*1000) return false;          // > 1 kk
+  const lastFetch = match.events_fetched_at ? new Date(match.events_fetched_at).getTime() : null;
+  if (lastFetch && now - lastFetch < 30*60*1000) return false;  // < 30 min sitten
+  const notParsedOk = match.events_available !== true;
+  const parsedTooEarly = lastFetch !== null
+    && lastFetch < matchTime + 6*3600*1000;
+  return notParsedOk || parsedTooEarly;
+  ```
+- Päivitetään `parseMissingMatches` → `parsePendingMatches(matches, onProgress)`:
+  - Erottelee:
+    - `missing` = ei `events_fetched_at` → kutsu ilman `force`.
+    - `reparse` = `needsReparsing(m) === true` ja `events_fetched_at` olemassa → kutsu `force: true`.
+  - Sama 6 workerin rinnakkaisuus.
+- Säilytetään vanha funktioneme exporttina yhteensopivuuden vuoksi tai uudelleennimeä ja päivitä kutsupaikka.
 
-- Sisäpelinäkymä ja sen URL-yhteensopivuus.
-- Aggregointilogiikka.
-- Match-sync-virtaus (ulkopeli käyttää samaa parsittua dataa).
+**`src/routes/team.$teamId.tsx`**
+- `useEffect`-haarassa lasketaan `pending = matches.filter(m => !m.events_fetched_at || needsReparsing(m))`.
+- Jos `pending.length === 0 && team?.last_player_sync` → ei syncia.
+- Kutsutaan `parsePendingMatches(pending, ...)` ja invalidoidaan samat cache-avaimet kuin nyt.
+
+### 3. Logiikka 2: "Päivitä"-nappi
+
+**Uusi komponentti `src/components/refresh-match-button.tsx`**
+- Props: `matchId`, `matchDate`, `teamId`, `seasonSeriesId`.
+- Näkyvyysehto: `matchDate < now && now - matchDate < 6h` (sekä menneisyydessä että ≤ 6 h sitten).
+- Tila:
+  - `loading` (parsinta käynnissä → spinner, disabled).
+  - `cooldown` (viimeinen klikkaus < 30 s sitten → näyttää "Odota X s", disabled, sekuntilaskuri `useEffect`+`setInterval`).
+  - `idle` → "Päivitä".
+- Klikkauksessa:
+  1. Aseta `loading`, tallenna `lastClickAt = Date.now()` (localStorage-avain `refresh-match:<matchId>` jotta selviää navigaatiosta — valinnainen, mutta suositeltava).
+  2. `supabase.functions.invoke("fetch-and-parse-match", { body: { match_id, force: true } })`.
+  3. Onnistuessa:
+     - `queryClient.invalidateQueries({ queryKey: ["v-at-bat", teamId, seasonSeriesId] })`
+     - sama avaimille: `v-pitch`, `opp-v-at-bat`, `opp-v-pitch`, `team-matches`, `pitch-points` (jos sellainen avain on; käytetään `predicate` joka tarkistaa `key[0]` starts-with).
+  4. Virheessä: `toast.error("Päivitys epäonnistui, kokeile uudelleen")` (Sonner on jo käytössä).
+  5. Lopuksi `setLoading(false)`, cooldown alkaa.
+
+**`src/routes/team.$teamId.tsx`**
+- Yhden ottelun valinnan yhteyteen (Select-komponentin viereen, kun `search.matchId` on asetettu) renderöi `<RefreshMatchButton ... />`.
+
+### 4. Cache-avainten invalidointi
+
+Käytetään `predicate`-muotoa varmistamaan kattava invalidointi:
+```
+queryClient.invalidateQueries({
+  predicate: q => {
+    const k = q.queryKey;
+    return Array.isArray(k) && typeof k[0] === "string"
+      && ["v-at-bat","v-pitch","opp-v-at-bat","opp-v-pitch","pitch-points","opp-pitch-points","team-matches"].includes(k[0])
+      && k[1] === teamId && k[2] === seasonSeriesId;
+  }
+});
+```
+
+## Mitä EI muuteta
+
+- Aggregointi, suodattimet, ulkopelinäkymä, RLS, tietokantaskeema.
+- `saveMatch` (on jo idempotentti upsert).
+- Sisäänpääsy / autentikointi.
+
+## Avoin kysymys
+
+Käytetäänkö napin cooldown-tilan säilyttämiseen `localStorage` (kestää sivulatauksen / navigaation yli) vai pelkkä komponentin tila (nollautuu navigoinnissa)? Spec ei pakota, mutta `localStorage` antaa todellisen spämmisuojan. Suositukseni: `localStorage`.

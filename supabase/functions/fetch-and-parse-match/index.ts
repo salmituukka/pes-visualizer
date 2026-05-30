@@ -38,12 +38,13 @@ Deno.serve(async (req) => {
     // 1) { match_id: 123, match_date_iso?: "..." }            → yksittäinen
     // 2) { matches: [{ match_id, match_date_iso? }, ...] }    → erä
     if (Array.isArray(body?.matches)) {
-      const matches: MatchInput[] = body.matches
+      const matches = body.matches
         .map((m: any) => ({
           match_id: Number(m?.match_id),
           match_date_iso: m?.match_date_iso ?? null,
+          force: Boolean(m?.force),
         }))
-        .filter((m: MatchInput) => Number.isFinite(m.match_id));
+        .filter((m: any) => Number.isFinite(m.match_id));
 
       if (matches.length === 0) {
         return new Response(
@@ -53,7 +54,8 @@ Deno.serve(async (req) => {
       }
 
       const concurrency = Number(body?.concurrency) || 6;
-      const results = await fetchAndParseMatchBatch(supabase, matches, apiKey, { concurrency });
+      const force = Boolean(body?.force);
+      const results = await fetchAndParseMatchBatch(supabase, matches, apiKey, { concurrency, force });
 
       return new Response(
         JSON.stringify({ status: 'success', count: results.length, results }),
@@ -73,7 +75,8 @@ Deno.serve(async (req) => {
     }
 
     const match_date_iso: string | null = body?.match_date_iso ?? null;
-    const result = await fetchAndParseMatch(supabase, match_id, match_date_iso, apiKey);
+    const force = Boolean(body?.force);
+    const result = await fetchAndParseMatch(supabase, match_id, match_date_iso, apiKey, { force });
     const status = result.status === 'error' ? 500 : 200;
 
     return new Response(JSON.stringify(result), {

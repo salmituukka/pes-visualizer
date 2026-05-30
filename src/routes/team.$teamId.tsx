@@ -12,7 +12,8 @@ import {
   opponentAtBatParticipantsQueryOptions,
   opponentPitchParticipantsQueryOptions,
 } from "@/lib/queries";
-import { ensurePlayerSync, parseMissingMatches } from "@/lib/match-sync";
+import { ensurePlayerSync, parsePendingMatches, needsReparsing } from "@/lib/match-sync";
+import { RefreshMatchButton } from "@/components/refresh-match-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { BaseFieldPicker, type SlotKey } from "@/components/base-field-picker";
 import { StatsDisplay } from "@/components/stats-display";
@@ -103,8 +104,8 @@ function TeamPage() {
   // Ensikäynnistys: sync players + fetch missing match events
   useEffect(() => {
     if (!matches || seasonSeriesId <= 0 || syncing) return;
-    const missing = matches.filter((m) => !m.events_fetched_at);
-    if (missing.length === 0 && team?.last_player_sync) return;
+    const pending = matches.filter((m: any) => !m.events_fetched_at || needsReparsing(m));
+    if (pending.length === 0 && team?.last_player_sync) return;
 
     let cancelled = false;
     (async () => {
@@ -112,7 +113,7 @@ function TeamPage() {
       try {
         await ensurePlayerSync(teamIdNum, seasonSeriesId, team?.last_player_sync ?? null);
         if (cancelled) return;
-        await parseMissingMatches(matches, (p) => !cancelled && setProgress(p));
+        await parsePendingMatches(matches as any, (p) => !cancelled && setProgress(p));
         if (cancelled) return;
         queryClient.invalidateQueries({ queryKey: ["v-at-bat", teamIdNum, seasonSeriesId] });
         queryClient.invalidateQueries({ queryKey: ["v-pitch", teamIdNum, seasonSeriesId] });
@@ -318,6 +319,18 @@ function FilterPanel({
               ))}
             </SelectContent>
           </Select>
+          {search.matchId && (() => {
+            const selected = matches?.find((m: any) => m.match_id === search.matchId);
+            if (!selected) return null;
+            return (
+              <RefreshMatchButton
+                matchId={search.matchId}
+                matchDate={selected.match_date ?? null}
+                teamId={teamId}
+                seasonSeriesId={seasonSeriesId}
+              />
+            );
+          })()}
         </CardContent>
       </Card>
 
