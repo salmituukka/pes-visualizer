@@ -319,6 +319,18 @@ function FilterPanel({
               ))}
             </SelectContent>
           </Select>
+          {search.matchId && (() => {
+            const selected = matches?.find((m: any) => m.match_id === search.matchId);
+            if (!selected) return null;
+            return (
+              <RefreshMatchButton
+                matchId={search.matchId}
+                matchDate={selected.match_date ?? null}
+                teamId={teamIdNum}
+                seasonSeriesId={seasonSeriesId}
+              />
+            );
+          })()}
         </CardContent>
       </Card>
 
