@@ -98,20 +98,21 @@ export async function syncTeamPlayers(
   }
 
   // 3. Pura matches (maps.matches)
+  // HUOM: stats-tool/players palauttaa vain ne ottelut joista on tilastoja
+  // (pelatut/parsittavissa olevat). Aikataulutetut/live-ottelut puuttuvat,
+  // joten haemme ne lisäksi /matches?team=X&type=all -endpointista (vaihe 3b).
   const matchUpserts: any[] = [];
   const seenMatchIds = new Set<number>();
 
   const matchList = rawData.maps?.matches ?? [];
 
   for (const entry of matchList) {
-    // Rakenne: { id: 128841, value: { id, home, away, date, result: { runs_home_*, runs_away_*, periods_home, periods_away } } }
     const m = entry.value ?? entry;
     const mid = typeof m?.id === 'number' ? m.id : (typeof entry.id === 'number' ? entry.id : null);
 
     if (mid === null || seenMatchIds.has(mid)) continue;
     seenMatchIds.add(mid);
 
-    // Laske kokonaisjuoksut summaamalla erät
     const result = m?.result ?? {};
     const home_runs = sumRuns(
       result.runs_home_first_period,
@@ -126,13 +127,61 @@ export async function syncTeamPlayers(
 
     matchUpserts.push({
       match_id: mid,
-      season_series_id: season_series_id, // käytetään parametriarvoa
+      season_series_id: season_series_id,
       home_team_id: m?.home ?? null,
       away_team_id: m?.away ?? null,
       match_date: m?.date ?? null,
       home_runs,
       away_runs,
     });
+  }
+
+  // 3b. Täydennä /matches?team=X&type=all -listalla: sisältää myös
+  // aikataulutetut ja live-ottelut, joita stats-tool/players ei palauta.
+  try {
+    const url2 = `${PESISTULOKSET_API_BASE}/matches?team=${team_id}&type=all&apikey=${apiKey}`;
+    const resp2 = await fetch(url2);
+    if (resp2.ok) {
+      const j: any = await resp2.json();
+      const arr: any[] = Array.isArray(j?.data) ? j.data : [];
+      for (const m of arr) {
+        const mid = typeof m?.id === 'number' ? m.id : null;
+        if (mid === null) continue;
+        const ss = m?.series?.seasonSeries ?? null;
+        // Käsittele vain saman sarjan ottelut — muut sarjat synkataan kun
+        // käyttäjä siirtyy niihin.
+        if (ss !== season_series_id) continue;
+
+        const details = m?.result?.details ?? {};
+        const home_runs = sumRuns(
+          details.runs_home_first_period,
+          details.runs_home_second_period,
+          details.runs_home_super_inning
+        );
+        const away_runs = sumRuns(
+          details.runs_away_first_period,
+          details.runs_away_second_period,
+          details.runs_away_super_inning
+        );
+
+        if (seenMatchIds.has(mid)) continue;
+        seenMatchIds.add(mid);
+        matchUpserts.push({
+          match_id: mid,
+          season_series_id: ss,
+          home_team_id: m?.home ?? null,
+          away_team_id: m?.away ?? null,
+          match_date: m?.date ?? null,
+          home_runs,
+          away_runs,
+        });
+      }
+    } else {
+      console.warn('[syncTeamPlayers] /matches?team= returned', resp2.status);
+    }
+  } catch (err) {
+    console.warn('[syncTeamPlayers] /matches?team= fetch failed:', err);
+    // Ei kriittinen virhe — jatketaan jo kerätyillä otteluilla.
   }
 
   // 4. Tallenna
