@@ -12,7 +12,8 @@ import {
   opponentAtBatParticipantsQueryOptions,
   opponentPitchParticipantsQueryOptions,
 } from "@/lib/queries";
-import { ensurePlayerSync, parseMissingMatches } from "@/lib/match-sync";
+import { ensurePlayerSync, parsePendingMatches, needsReparsing } from "@/lib/match-sync";
+import { RefreshMatchButton } from "@/components/refresh-match-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { BaseFieldPicker, type SlotKey } from "@/components/base-field-picker";
 import { StatsDisplay } from "@/components/stats-display";
