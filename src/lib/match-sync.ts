@@ -2,9 +2,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 const MAX_CONCURRENCY = 6;
 
+// Sync players/matches melko aggressiivisesti: idempotentti upsert, mutta varmistaa
+// että uudet ottelut (esim. äsken aikataulutettu / juuri pelattu) tulevat matches-tauluun
+// jotta parsePendingMatches voi käsitellä ne.
+const PLAYER_SYNC_TTL_MS = 60 * 60 * 1000; // 1 h
+
 export async function ensurePlayerSync(team_id: number, season_series_id: number, last_sync: string | null) {
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const needs = !last_sync || new Date(last_sync).getTime() < weekAgo;
+  const threshold = Date.now() - PLAYER_SYNC_TTL_MS;
+  const needs = !last_sync || new Date(last_sync).getTime() < threshold;
   if (!needs) return;
   await supabase.functions.invoke("sync-team-players", {
     body: { team_id, season_series_id },
