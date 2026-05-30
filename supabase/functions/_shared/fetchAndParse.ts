@@ -220,10 +220,11 @@ export async function fetchAndParseMatch(
  */
 export async function fetchAndParseMatchBatch(
   supabase: SupabaseLike & any,
-  matches: { match_id: number; match_date_iso: string | null }[],
+  matches: { match_id: number; match_date_iso: string | null; force?: boolean }[],
   apiKey: string,
   options: {
     concurrency?: number;
+    force?: boolean;
     onProgress?: (done: number, total: number, lastResult: FetchAndParseResult) => void;
   } = {}
 ): Promise<FetchAndParseResult[]> {
@@ -231,11 +232,12 @@ export async function fetchAndParseMatchBatch(
   const results: FetchAndParseResult[] = new Array(matches.length);
   let done = 0;
   
-  // Yksinkertainen rinnakkaiskäsittely: jaetaan eriin
   for (let i = 0; i < matches.length; i += concurrency) {
     const batch = matches.slice(i, i + concurrency);
     const batchPromises = batch.map((m, idx) =>
-      fetchAndParseMatch(supabase, m.match_id, m.match_date_iso, apiKey).then(r => {
+      fetchAndParseMatch(supabase, m.match_id, m.match_date_iso, apiKey, {
+        force: m.force ?? options.force ?? false,
+      }).then(r => {
         results[i + idx] = r;
         done++;
         if (options.onProgress) options.onProgress(done, matches.length, r);
