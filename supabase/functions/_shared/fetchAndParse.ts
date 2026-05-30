@@ -154,15 +154,24 @@ export async function fetchAndParseMatch(
   supabase: SupabaseLike & any,
   match_id: number,
   match_date_iso: string | null,
-  apiKey: string
+  apiKey: string,
+  opts: { force?: boolean } = {}
 ): Promise<FetchAndParseResult> {
-  // 1. Tarkista onko parsinta tarpeen
-  const check = await shouldFetchMatch(supabase, match_id, match_date_iso);
-  if (!check.should_fetch) {
-    if (check.reason === 'already_parsed' || check.reason === 'concurrent_fetch') {
-      return { status: 'skipped', reason: check.reason };
+  // 1. Tarkista onko parsinta tarpeen (paitsi jos force=true)
+  if (!opts.force) {
+    const check = await shouldFetchMatch(supabase, match_id, match_date_iso);
+    if (!check.should_fetch) {
+      if (check.reason === 'already_parsed' || check.reason === 'concurrent_fetch') {
+        return { status: 'skipped', reason: check.reason };
+      }
+      return { status: 'skipped', reason: 'already_parsed' };
     }
-    return { status: 'skipped', reason: 'already_parsed' };
+  } else {
+    // Force: päivitä events_fetched_at että muut clientit eivät yritä samaan aikaan
+    await supabase
+      .from('matches')
+      .update({ events_fetched_at: new Date().toISOString() })
+      .eq('match_id', match_id);
   }
   
   // 2. Hae API:sta
