@@ -271,8 +271,9 @@ function parseSubEvent(sub: RawSubEvent, prev_bases: (number | null)[], in_pitch
   for (const t of sub.texts) {
     if (typeof t === "string") continue;
     types.add(t.type);
-    if (t.type === "player" && player_id === null) {
-      player_id = (t as any).id;
+    if (t.type === "player" && player_id == null) {
+      const id = (t as any).id;
+      player_id = (typeof id === "number" && Number.isFinite(id)) ? id : null;
     } else if (t.type === "event" && event_text === null) {
       event_text = (t as any).text;
     } else if (t.type === "hit") {
