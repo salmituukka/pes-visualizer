@@ -333,6 +333,7 @@ function addPitchRows(
   // Pitch-segmentit
   let seq = start_sequence;
   for (const seg of pitch.segments) {
+    if (seg.player_id == null) continue;
     rows.segments.push({
       match_id,
       period: ab.period,
