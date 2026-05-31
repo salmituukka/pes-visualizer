@@ -301,7 +301,7 @@ function parseSubEvent(sub: RawSubEvent, prev_bases: (number | null)[], in_pitch
   }
 
   // 3. Tuntematon (esim. ei pelaajaa eikä eventiä)
-  if (!event_text || player_id === null) {
+  if (!event_text || player_id == null) {
     return { kind: "unknown" };
   }
 
