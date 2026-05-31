@@ -239,6 +239,7 @@ function addAtBatRows(
   
   // Ensin pre-hit-segmentit (hyvälaatuiselle) tai kaikki at-bat-segmentit (huonolaatuiselle)
   for (const seg of ab.pre_hit_segments) {
+    if (seg.player_id == null) continue;
     rows.segments.push({
       match_id,
       period: ab.period,
@@ -332,6 +333,7 @@ function addPitchRows(
   // Pitch-segmentit
   let seq = start_sequence;
   for (const seg of pitch.segments) {
+    if (seg.player_id == null) continue;
     rows.segments.push({
       match_id,
       period: ab.period,
